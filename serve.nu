@@ -35,7 +35,7 @@ def datastar-js []: nothing -> string {
 # changes how their own views are counted as visitors.
 def client-ip [req: record]: nothing -> string {
   let forwarded = ($req.headers | get -o x-forwarded-for | default "" | split row "," | first | default "" | str trim)
-  if $forwarded != "" { $forwarded } else { $req.trusted_ip? | default $req.remote_ip | default "" }
+  if $forwarded != "" { $forwarded } else { $req.trusted_ip? | default ($req.remote_ip? | default "") }
 }
 
 # Sites that may send views: origin -> site name in the topic.
@@ -156,10 +156,11 @@ def board []: nothing -> string {
     # address), to see which header carries the reader's IP behind the proxy.
     (route {method: "GET", path: "/whoami"} {|req ctx|
       {
-        remote_ip: $req.remote_ip
-        trusted_ip: ($req.trusted_ip? | default null)
-        used: (client-ip $req)
-        headers: ($req.headers | select -o x-forwarded-for x-real-ip forwarded true-client-ip cf-connecting-ip x-client-ip via)
+        used: (try { client-ip $req } catch {|e| $"error: ($e.msg)" })
+        request: ($req | reject -o headers)
+        header_names: ($req.headers? | default {} | columns)
+        headers: ($req.headers? | default {} | select -o x-forwarded-for x-real-ip forwarded true-client-ip cf-connecting-ip x-client-ip via)
+        nu: (version | get version)
       } | to json | metadata set --content-type "application/json"
     })
 
