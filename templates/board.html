@@ -8,6 +8,8 @@
 </div>
 <div class="grid">
   <section>
+    <h2>Hot lige nu</h2>
+    <table>{% for r in hot %}<tr><td class="p"><a href="https://www.folkets.dk{{ r.name | e }}" target="_blank" rel="noreferrer">{{ r.name }}</a></td><td class="n" title="{{ r.views }} {% if r.views == 1 %}visning{% else %}visninger{% endif %} den seneste time">{{ r.score }}</td></tr>{% else %}<tr><td class="empty">Intet den seneste time</td></tr>{% endfor %}</table>
     <h2>Mest læst i dag</h2>
     <table>{% for r in today.paths %}<tr><td class="p"><a href="https://www.folkets.dk{{ r.name | e }}" target="_blank" rel="noreferrer">{{ r.name }}</a></td><td class="n">{{ r.views }}</td></tr>{% endfor %}</table>
   </section>

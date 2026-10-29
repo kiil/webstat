@@ -6,6 +6,10 @@
 # Copenhagen time), so a replay from the first frame gives the same result.
 # When a view from a new day arrives, today's views and visitors move into
 # the history (the last 400 days are kept).
+#
+# It also keeps the last hour of views as {path, ts} (`recent`), from which
+# the server scores what is hot right now; views without `ts` (before the
+# server stamped them) are left out.
 {
   run: {|frame, state = {}|
     let p = ($frame.topic | split row ".")
@@ -31,6 +35,12 @@
         | transpose k v | sort-by k | last 400 | reduce -f {} {|r, acc| $acc | insert $r.k $r.v })}
     } else {
       {today: $current, history: $history}
+    })
+
+    let ts = ($m | get -o ts)
+    let kept = ($state | get -o recent | default [])
+    let recent = (if ($ts | describe) != "int" { $kept } else {
+      $kept | where ts > ($ts - 3600) | append {path: ($m | get -o path | default "/"), ts: $ts}
     })
 
     let bump = {|r: record, k: any| if $k == null { $r } else { $r | upsert ($k | into string) (($r | get -o ($k | into string) | default 0) + 1) } }
@@ -59,10 +69,11 @@
         systems: (do $top $today.systems 6)
         types: (do $top $today.types 6)
       }
+      recent: $recent
       history: ($rolled.history | transpose day figures | sort-by day --reverse | first 30
         | each {|r| {day: $r.day, views: $r.figures.views, visitors: $r.figures.visitors} })
     }
-    {out: $out, next: {today: $today, history: $rolled.history}}
+    {out: $out, next: {today: $today, history: $rolled.history, recent: $recent}}
   }
 
   start: "first"

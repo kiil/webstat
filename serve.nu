@@ -123,9 +123,31 @@ def stats []: nothing -> any {
   try { (.last webstat-stats.out).meta } catch { null }
 }
 
+# Half-life of a view in the hot list, in seconds; after an hour a view
+# no longer counts.
+const HOT_HALF_LIFE = 900
+
+# What is hot right now: every view in the last hour weighs 0.5^(age /
+# half-life), summed per path. Scored at render time, so the list cools
+# between views too.
+def hot [recent: list, now: int]: nothing -> list {
+  $recent
+  | where {|r| ($now - $r.ts) <= 3600 }
+  | group-by path
+  | items {|path, views|
+    let score = ($views | each {|r| 0.5 ** (([0 ($now - $r.ts)] | math max) / $HOT_HALF_LIFE) } | math sum)
+    {name: $path, score: ($score | math round --precision 1), views: ($views | length)}
+  }
+  | sort-by score --reverse
+  | first 10
+}
+
 # The board region, rendered from the actor's latest figures.
 def board []: nothing -> string {
-  stats | default {today: null, history: []}
+  let s = (stats | default {today: null, history: []})
+  let now = ((date now | into int) // 1_000_000_000)
+  $s
+  | merge {hot: (hot ($s | get -o recent | default []) $now)}
   | merge {rendered: (date now | date to-timezone Europe/Copenhagen | format date "%H:%M:%S")}
   | .mj ($HERE | path join "templates" "board.html")
 }
@@ -148,7 +170,7 @@ def board []: nothing -> string {
         let day = (today)
         let ip = (client-ip $req)
         let visitor = (if (internal-ip $ip) { null } else { $"(salt $day)|($ip)|($ua)" | hash sha256 | str substring 0..15 })
-        let meta = ($v | merge (agent $ua) | merge {day: $day, visitor: $visitor} | compact)
+        let meta = ($v | merge (agent $ua) | merge {day: $day, ts: ((date now | into int) // 1_000_000_000), visitor: $visitor} | compact)
         "" | .append $"webstat.($site).pageview" --meta $meta | ignore
         "" | status 204 $cors
       }

@@ -53,6 +53,15 @@ visibility, `pageshow`, `online`, and once a minute while visible) it calls
 `GET /refresh` for one patch, because a stream can die without an error. If
 Caddy buffers responses, turn that off for `/updates` or nothing arrives.
 
+## Hot right now
+
+The actor keeps the last hour of views as `{path, ts}` (`recent` in its
+output; `ts` is the server's clock in seconds). When the board renders, each
+view weighs `0.5 ^ (age / 900)` (a 15-minute half-life) and the weights are
+summed per path; the ten highest make "Hot lige nu". The score is computed at
+render time, so the list cools between views too, and the page's once-a-minute
+refresh keeps it current. `HOT_HALF_LIFE` in `serve.nu` sets the half-life.
+
 ## Events
 
 `webstat.<site>.pageview`, empty body, everything in meta:
@@ -66,6 +75,7 @@ Caddy buffers responses, turn that off for `/updates` or nothing arrives.
 | `lang` | `<html lang>` |
 | `browser`, `system` | coarse family from the user agent, on the server |
 | `day` | Copenhagen date, on the server |
+| `ts` | Unix time in seconds, on the server |
 | `visitor` | first 16 hex of sha256(salt, IP, user agent) |
 
 The server accepts a view only from the origins in `SITES` (others get 403),
