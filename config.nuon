@@ -1,0 +1,9 @@
+# Settings for webstat that are safe to keep in git. The collector key and
+# the ntfy topic are secrets: they live in the store (webstat.settings), set
+# with POST /admin/settings, never in this repo.
+{
+  # A path whose hot score reaches this is "taking off" (once a day per path).
+  spike: 6
+  # Local hour (Copenhagen) for the morning report on yesterday.
+  report_hour: 7
+}

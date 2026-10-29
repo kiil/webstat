@@ -1,14 +1,22 @@
 # webstat
 
-Page views from folkets.dk, one event per view, in an xs store, served by
-http-nu at `https://webstat.kiil.cross.stream`.
+Page views, reading depth, time on page and support clicks from folkets.dk,
+as events in an xs store, served by http-nu at
+`https://webstat.kiil.cross.stream`.
 
 | File | Role |
 | --- | --- |
-| `serve.nu` | http-nu handler: `POST /hit` (the beacon), `GET /` (live dashboard), `GET /updates` and `GET /refresh` (Datastar SSE), `GET /api/stats`, `GET /health` |
-| `actors/stats.nu` | folds `webstat.*.pageview` into today's figures and a history per day, written to `webstat-stats.out` |
-| `templates/page.html`, `templates/board.html` | the dashboard shell and the region `#board` that Datastar patches |
+| `serve.nu` | http-nu handler: `POST /hit` (events), `GET /` (live dashboard), `GET /updates` and `GET /refresh` (Datastar SSE), `GET /api/hot`, `GET /api/stats`, `GET /health`, `GET /whoami` |
+| `lib.nu` | hot score and small helpers shared by the handler and the service |
+| `actors/stats.nu` | folds the events into today's figures and a history per day, written to `webstat-stats.out` |
+| `services/alerts.nu` | spike alerts and the morning report via ntfy |
+| `templates/page.html`, `templates/board.html` | the dashboard shell and the region `#board` that Datastar patches (minijinja) |
 | `beacon.js` | the script for folkets.dk's palette block |
+| `config.nuon` | the spike threshold and the report hour (no secrets) |
+| `secrets.nuon` | local only, gitignored: the collector key and the ntfy topic, sent once with `POST /admin/settings` |
+
+The collector itself lives in the folkets repo
+(`tools/folkets/site/nyt.php`, deployed as `web/nyt.php`).
 
 ## Run
 
@@ -53,6 +61,39 @@ visibility, `pageshow`, `online`, and once a minute while visible) it calls
 `GET /refresh` for one patch, because a stream can die without an error. If
 Caddy buffers responses, turn that off for `/updates` or nothing arrives.
 
+## Collector on folkets.dk
+
+The beacon posts to `/nyt.php` on folkets.dk, not to this host: ad blockers
+leave a site's own requests alone, and PHP sees the reader's address
+(Cloudflare's `CF-Connecting-IP`), which cross.stream's proxy does not pass
+on. `nyt.php` answers 204 at once and forwards the body with
+`X-Webstat-Key` (from `~/.folkets-webstat-key` on the folkets server, the same
+as the key webstat keeps in its store) and `X-Webstat-Ip`. Only a request with the key may
+name the IP. `GET /nyt.php?hot` serves `/api/hot`, cached for a minute, to the
+"Hot lige nu" block the beacon builds on the front page.
+
+## Alerts and morning report
+
+`services/alerts.nu` checks once a minute. A path whose hot score reaches
+`spike` gets one ntfy message a day ("Tager fart: …", with the main referrer
+and a link); `webstat.alert` frames record what was sent. After
+`report_hour` (Copenhagen) it sends one report on yesterday: views, visitors,
+support clicks and the top five (`webstat.report` frames). Subscribe to the
+topic in the ntfy app; anyone who knows the topic can read it.
+
+## Secrets
+
+The collector key and the ntfy topic are kept out of git. They live in the
+store as `webstat.settings` (ttl last:1), set with
+
+```bash
+nu -c 'open secrets.nuon | to json' | curl -sX POST https://webstat.kiil.cross.stream/admin/settings --data-binary @-
+```
+
+The first call may set them; after that a call must carry the current key in
+`X-Webstat-Key`. Without them webstat still counts views, but no visitor is
+recorded and no alert is sent.
+
 ## Hot right now
 
 The actor keeps the last hour of views as `{path, ts}` (`recent` in its
@@ -64,41 +105,25 @@ refresh keeps it current. `HOT_HALF_LIFE` in `serve.nu` sets the half-life.
 
 ## Events
 
-`webstat.<site>.pageview`, empty body, everything in meta:
+All under `webstat.<site>.`, empty body, the facts in meta; every event has
+`path`, `view` (a random id per page view, kept only by the page), `day`
+(Copenhagen) and `ts` (Unix seconds), set on the server.
 
-| Field | From |
+| Topic | Meta |
 | --- | --- |
-| `path` | `location.pathname`, decoded |
-| `nid`, `type` | Drupal's `drupalSettings.path.currentPath` and the article's `node--type-*` class |
-| `ref` | the referrer's host when it is another site |
-| `device` | `mobile` (< 768 px), `tablet` (< 1200 px) or `desktop` |
-| `lang` | `<html lang>` |
-| `browser`, `system` | coarse family from the user agent, on the server |
-| `day` | Copenhagen date, on the server |
-| `ts` | Unix time in seconds, on the server |
-| `visitor` | first 16 hex of sha256(salt, IP, user agent) |
+| `pageview` | `title` (the page's h1), `nid`, `type` (`node--type-*`), `ref` (another site's host), `from` (the path on folkets.dk the reader came from), `device` (`mobile` < 768 px, `tablet` < 1200 px, `desktop`), `lang`, `browser`, `system` (coarse, from the user agent), `visitor` |
+| `read` | `depth`: 50 when half the article body has been on screen, 100 at 95 percent |
+| `leave` | `seconds` the page was visible, sent each time it is hidden; the latest per view counts |
+| `click` | `target`: the path and query of an `/abonnent` or `/stot` link, or `stripe` |
 
-The server accepts a view only from the origins in `SITES` (others get 403),
-drops self-declared bots, prefetches and malformed bodies (204, nothing
-stored), and stores no IP address or user agent. The salt lives in http-nu's
-in-memory `stor` and changes every day, so a visitor is counted once a day and
-cannot be followed across days; a restart starts a new salt, so readers seen
-before and after it count twice that day.
-
-## On folkets.dk
-
-Paste `beacon.js` into the `<script>` of the palette block
-(`/Users/lk/iwes/folkets/tools/folkets/site/folkets-palette.php`) and run that
-script on the site. It sends one `text/plain` beacon per page view (no CORS
-preflight, no cookies, nothing stored in the browser). Readers with an ad
-blocker or without JavaScript are not counted; `folkets_counter`, which counts
-from the access log, remains the cross-check.
-
-The privacy page should say that page views are counted anonymously on our
-own server.
+`visitor` is the first 16 hex of sha256(salt, IP, user agent), only when
+the IP is a public address. The server accepts events only from the origins
+in `SITES` (others get 403), drops self-declared bots, prefetches and
+malformed bodies (204, nothing stored), and stores no IP address or user
+agent. The salt lives in http-nu's in-memory `stor` and changes every day.
 
 ## Dashboard access
 
 `GET /` and `GET /api/stats` are open to anyone who knows the address. To
-close them, put basic auth in Caddy on everything except `/hit`, which the
-readers' browsers must reach.
+close them, put basic auth in front of everything except `/hit` and
+`/api/hot`, which the collector on folkets.dk calls.
