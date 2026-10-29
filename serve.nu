@@ -1,6 +1,9 @@
 # webstat: page views from folkets.dk, one event per view, in an xs store.
 #
-#   http-nu :3080 --store ./store --services --datastar --trust-proxy 127.0.0.1/32 serve.nu
+# Deployed by pushing to cross.stream, which reads the features from
+# cross-stream.nuon. Locally:
+#
+#   http-nu :3080 --store ./store --services --datastar serve.nu
 #
 # POST /hit takes the beacon the site sends on every page view (beacon.js),
 # checks it and appends `webstat.<site>.pageview` with the facts in meta. No
@@ -18,8 +21,22 @@ use http-nu/datastar *
 
 const HERE = (path self .)
 
-# The bundle http-nu 0.18 serves with --datastar.
+# The Datastar bundle: cross.stream says where in $DATASTAR_JS_PATH; local
+# http-nu 0.18 serves it here.
 const DATASTAR_JS = "/datastar@1.0.4.js"
+
+def datastar-js []: nothing -> string {
+  $env.DATASTAR_JS_PATH? | default $DATASTAR_JS
+}
+
+# The reader's address. cross.stream's proxy puts it first in
+# X-Forwarded-For and http-nu runs there without --trust-proxy, so
+# remote_ip is the proxy. A reader can prepend a made-up address; that only
+# changes how their own views are counted as visitors.
+def client-ip [req: record]: nothing -> string {
+  let forwarded = ($req.headers | get -o x-forwarded-for | default "" | split row "," | first | default "" | str trim)
+  if $forwarded != "" { $forwarded } else { $req.trusted_ip? | default $req.remote_ip | default "" }
+}
 
 # Sites that may send views: origin -> site name in the topic.
 const SITES = {
@@ -121,7 +138,7 @@ def board []: nothing -> string {
         "" | status 204 $cors
       } else {
         let day = (today)
-        let ip = ($req.trusted_ip? | default $req.remote_ip | default "")
+        let ip = (client-ip $req)
         let visitor = ($"(salt $day)|($ip)|($ua)" | hash sha256 | str substring 0..15)
         let meta = ($v | merge (agent $ua) | merge {day: $day, visitor: $visitor} | compact)
         "" | .append $"webstat.($site).pageview" --meta $meta | ignore
@@ -148,7 +165,7 @@ def board []: nothing -> string {
     (route {method: "GET", path: "/refresh"} {|req ctx| board | to datastar-patch-elements | to sse })
 
     (route {method: "GET", path: "/"} {|req ctx|
-      {board: (board), datastar_js: $DATASTAR_JS} | .mj ($HERE | path join "templates" "page.html")
+      {board: (board), datastar_js: (datastar-js)} | .mj ($HERE | path join "templates" "page.html")
     })
 
     (route true {|req ctx| "Not found" | status 404 {"Content-Type": "text/plain"} })

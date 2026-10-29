@@ -12,17 +12,23 @@ http-nu at `https://webstat.kiil.cross.stream`.
 
 ## Run
 
+On cross.stream: push to `main`. `cross-stream.nuon` turns on the store, the
+services (the stats actor needs them) and the Datastar bundle; the site is
+live at `https://webstat.kiil.cross.stream`.
+
+Locally:
+
 ```bash
-http-nu :3080 --store ./store --services --datastar --trust-proxy 127.0.0.1/32 serve.nu
+http-nu :3080 --store ./store --services --datastar serve.nu
 ```
 
-- `--services` is required: without it the stats actor does not run and the
-  dashboard stays empty (the views are still stored).
-- `--datastar` serves the bundle the page loads (`/datastar@1.0.4.js` in
-  http-nu 0.18); without it the page renders once and never updates.
-- `--trust-proxy` must name the proxy in front (Caddy) so `$req.trusted_ip`
-  is the reader's address. Without it every reader looks like the proxy and
-  the visitor count collapses to one.
+- Without `--services` the stats actor does not run and the dashboard stays
+  empty (the views are still stored).
+- Without `--datastar` the page renders once and never updates. The handler
+  takes the bundle's path from `$DATASTAR_JS_PATH` and falls back to
+  `/datastar@1.0.4.js`, where local http-nu 0.18 serves it.
+- The visitor hash uses the first address in `X-Forwarded-For`, which the
+  cross.stream proxy sets, and `remote_ip` when there is none.
 - Keep `./store` out of the directory if you run with `-w`, or the watcher
   reloads on every view.
 
