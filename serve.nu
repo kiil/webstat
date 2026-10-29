@@ -152,6 +152,17 @@ def board []: nothing -> string {
 
     (route {method: "GET", path: "/health"} {|req ctx| "ok" })
 
+    # What the platform tells us about the caller (only ever the caller's own
+    # address), to see which header carries the reader's IP behind the proxy.
+    (route {method: "GET", path: "/whoami"} {|req ctx|
+      {
+        remote_ip: $req.remote_ip
+        trusted_ip: ($req.trusted_ip? | default null)
+        used: (client-ip $req)
+        headers: ($req.headers | select -o x-forwarded-for x-real-ip forwarded true-client-ip cf-connecting-ip x-client-ip via)
+      } | to json | metadata set --content-type "application/json"
+    })
+
     # Live feed: the board as it stands at connect time (so a reconnect
     # repairs whatever was missed), then one patch per new figure.
     (route {method: "GET", path: "/updates"} {|req ctx|
