@@ -1,7 +1,7 @@
 # webstat
 
 Page views from folkets.dk, one event per view, in an xs store, served by
-http-nu at `https://stats.kiil.cross.stream`.
+http-nu at `https://webstat.kiil.cross.stream`.
 
 | File | Role |
 | --- | --- |

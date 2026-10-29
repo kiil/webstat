@@ -29,5 +29,5 @@
     device: width < 768 ? 'mobile' : width < 1200 ? 'tablet' : 'desktop',
     lang: document.documentElement.lang || null
   };
-  navigator.sendBeacon('https://stats.kiil.cross.stream/hit', new Blob([JSON.stringify(data)], {type: 'text/plain'}));
+  navigator.sendBeacon('https://webstat.kiil.cross.stream/hit', new Blob([JSON.stringify(data)], {type: 'text/plain'}));
 })();
