@@ -29,13 +29,21 @@ def datastar-js []: nothing -> string {
   $env.DATASTAR_JS_PATH? | default $DATASTAR_JS
 }
 
-# The reader's address. cross.stream's proxy puts it first in
-# X-Forwarded-For and http-nu runs there without --trust-proxy, so
-# remote_ip is the proxy. A reader can prepend a made-up address; that only
-# changes how their own views are counted as visitors.
+# The reader's address: the first X-Forwarded-For entry, else trusted_ip or
+# remote_ip. A reader can prepend a made-up address; that only changes how
+# their own views are counted as visitors.
 def client-ip [req: record]: nothing -> string {
   let forwarded = ($req.headers | get -o x-forwarded-for | default "" | split row "," | first | default "" | str trim)
   if $forwarded != "" { $forwarded } else { $req.trusted_ip? | default ($req.remote_ip? | default "") }
+}
+
+# An address that says nothing about the reader: empty, loopback or private.
+# As of 2026-10-29 cross.stream's inner proxy overwrites X-Forwarded-For with
+# the outer proxy's 10.x address and passes no remote_ip, so every reader
+# arrives as the same address; hashing it would count everyone as one
+# visitor, so no visitor is recorded until the platform passes the real IP.
+def internal-ip [ip: string]: nothing -> bool {
+  $ip == "" or ($ip =~ '^(10\.|127\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|::1$|f[cd][0-9a-f]{2}:)')
 }
 
 # Sites that may send views: origin -> site name in the topic.
@@ -139,7 +147,7 @@ def board []: nothing -> string {
       } else {
         let day = (today)
         let ip = (client-ip $req)
-        let visitor = ($"(salt $day)|($ip)|($ua)" | hash sha256 | str substring 0..15)
+        let visitor = (if (internal-ip $ip) { null } else { $"(salt $day)|($ip)|($ua)" | hash sha256 | str substring 0..15 })
         let meta = ($v | merge (agent $ua) | merge {day: $day, visitor: $visitor} | compact)
         "" | .append $"webstat.($site).pageview" --meta $meta | ignore
         "" | status 204 $cors

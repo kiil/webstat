@@ -27,8 +27,14 @@ http-nu :3080 --store ./store --services --datastar serve.nu
 - Without `--datastar` the page renders once and never updates. The handler
   takes the bundle's path from `$DATASTAR_JS_PATH` and falls back to
   `/datastar@1.0.4.js`, where local http-nu 0.18 serves it.
-- The visitor hash uses the first address in `X-Forwarded-For`, which the
-  cross.stream proxy sets, and `remote_ip` when there is none.
+- The visitor hash uses the first address in `X-Forwarded-For`, else
+  `trusted_ip` or `remote_ip`. An internal address (10.x, 192.168.x, loopback
+  and the like) gives no visitor. As of 2026-10-29 cross.stream's inner proxy
+  overwrites `X-Forwarded-For` with `10.79.0.2` and passes no `remote_ip`, so
+  every reader looks the same: views are counted, visitors show "–" until the
+  platform passes the reader's address (e.g. `trusted_proxies` on the inner
+  Caddy, or `X-Real-IP` set by the outer one). `GET /whoami` shows what
+  arrives, for the caller only.
 - Keep `./store` out of the directory if you run with `-w`, or the watcher
   reloads on every view.
 
