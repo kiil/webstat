@@ -8,7 +8,8 @@
 // Reports: the page view; reading 50 and 100 percent of an article; the
 // seconds the page was visible (when it is hidden or left); clicks on
 // support and subscription links. On the front page it also puts webstat's
-// hot list above "Ugens eftertragtede".
+// hot list above "Ugens eftertragtede" (when at least two articles are
+// hot).
 (function () {
   if (!navigator.sendBeacon || navigator.webdriver || document.visibilityState === 'prerender') { return; }
   var collector = '/nyt.php';
@@ -113,7 +114,7 @@
     if (!anchor || !window.fetch) { return; }
     fetch(collector + '?hot').then(function (r) { return r.ok ? r.json() : []; }).then(function (items) {
       items = (items || []).filter(function (i) { return i.title && i.name !== '/' && i.name.indexOf('/abonnent') !== 0; });
-      if (items.length < 3) { return; }
+      if (items.length < 2) { return; }
       var block = document.createElement('div');
       block.className = 'block folkets-hot';
       var h = document.createElement('h2');

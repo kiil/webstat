@@ -139,7 +139,8 @@ def report []: any -> any {
   let b = (if ($raw | describe) == "nothing" { null } else { try { $raw | decode utf-8 | from json } catch { try { $raw | from json } catch { null } } })
   if not (($b | describe) | str starts-with "record") { return null }
   let path = (site-path ($b | get -o path))
-  if $path == null { return null }
+  # /webstat-test is what a hand-made test request uses; it is never counted.
+  if $path == null or ($path starts-with "/webstat-test") { return null }
   let view = ($b | get -o view | default "" | into string)
   let common = {path: $path, view: (if $view =~ '^[a-z0-9]{4,16}$' { $view } else { null })}
   let kind = ($b | get -o kind | default "view")
@@ -234,11 +235,14 @@ def board []: nothing -> string {
       }
     })
 
-    # The hot list for folkets.dk's own block (fetched through nyt.php).
+    # The hot list for folkets.dk's own block (fetched through nyt.php):
+    # articles only (a headline, not the front page or /abonnent) with a
+    # score of at least 0.5, about one view in the last half hour.
     (route {method: "GET", path: "/api/hot"} {|req ctx|
       let s = (stats | default {})
-      hot ($s | get -o recent | default []) ($s | get -o today.titles | default {}) (now-seconds) 5
-      | where score >= 1
+      hot ($s | get -o recent | default []) ($s | get -o today.titles | default {}) (now-seconds) 20
+      | where {|h| $h.score >= 0.5 and $h.title != null and $h.name != "/" and not ($h.name starts-with "/abonnent") and not ($h.name starts-with "/webstat-test") }
+      | first 5
       | to json
       | metadata set { merge {'http.response': {headers: {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "max-age=60"}}} }
     })
