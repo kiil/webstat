@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="30">
+<script type="module" src="{{ datastar_js }}"></script>
 <meta name="robots" content="noindex">
 <title>Webstat</title>
 <style>
@@ -26,42 +26,31 @@ td{padding:.35rem 0;border-bottom:1px solid var(--rule);vertical-align:baseline}
 td.n{text-align:right;font-variant-numeric:tabular-nums;width:4.5rem;color:var(--muted)}
 td.p{overflow-wrap:anywhere}
 a{color:inherit}
+.live{display:inline-block;width:.55rem;height:.55rem;border-radius:50%;background:#2E9E5B;margin-right:.35rem;vertical-align:middle;animation:pulse 2s infinite}
+@keyframes pulse{50%{opacity:.35}}
 .empty{color:var(--muted)}
 </style>
 </head>
-<body>
+<body data-init="@get('/updates')" data-on:refresh="@get('/refresh')">
 <main>
 <h1>Webstat</h1>
-<div class="sub">folkets.dk · opdateres hvert halve minut{% if today %} · {{ today.day }}{% endif %}</div>
-{% if today %}
-<div class="tiles">
-  <div class="tile"><b>{{ today.views }}</b><span>Visninger i dag</span></div>
-  <div class="tile"><b>{{ today.visitors }}</b><span>Besøgende i dag</span></div>
-  {% for d in today.devices %}{% if loop.index <= 2 %}<div class="tile"><b>{{ d.views }}</b><span>{{ {"mobile": "Mobil", "tablet": "Tablet", "desktop": "Computer"}[d.name] | default(d.name) }}</span></div>{% endif %}{% endfor %}
-</div>
-<div class="grid">
-  <section>
-    <h2>Mest læst i dag</h2>
-    <table>{% for r in today.paths %}<tr><td class="p"><a href="https://www.folkets.dk{{ r.name | e }}" target="_blank" rel="noreferrer">{{ r.name }}</a></td><td class="n">{{ r.views }}</td></tr>{% endfor %}</table>
-  </section>
-  <section>
-    <h2>Henvisninger</h2>
-    <table>{% for r in today.refs %}<tr><td class="p">{{ r.name }}</td><td class="n">{{ r.views }}</td></tr>{% else %}<tr><td class="empty">Ingen endnu</td></tr>{% endfor %}</table>
-    <h2>Indholdstyper</h2>
-    <table>{% for r in today.types %}<tr><td>{{ r.name }}</td><td class="n">{{ r.views }}</td></tr>{% endfor %}</table>
-    <h2>Browsere</h2>
-    <table>{% for r in today.browsers %}<tr><td>{{ r.name }}</td><td class="n">{{ r.views }}</td></tr>{% endfor %}</table>
-    <h2>Systemer</h2>
-    <table>{% for r in today.systems %}<tr><td>{{ r.name }}</td><td class="n">{{ r.views }}</td></tr>{% endfor %}</table>
-  </section>
-</div>
-{% if history %}
-<h2>Tidligere dage</h2>
-<table>{% for d in history %}<tr><td>{{ d.day }}</td><td class="n">{{ d.visitors }}</td><td class="n">{{ d.views }}</td></tr>{% endfor %}</table>
-{% endif %}
-{% else %}
-<p class="empty">Ingen visninger endnu.</p>
-{% endif %}
+{{ board | safe }}
 </main>
+<script>
+// The live stream can die silently (a phone leaving the screen, a sleeping
+// laptop). Ask for the current board whenever the page comes back, and once
+// a minute while it is visible; the patch is idempotent.
+let last = 0;
+const resync = () => {
+  if (Date.now() - last < 500) return;
+  last = Date.now();
+  document.body.dispatchEvent(new CustomEvent("refresh", {bubbles: true}));
+};
+addEventListener("focus", resync);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") resync(); });
+addEventListener("pageshow", (e) => { if (e.persisted) resync(); });
+addEventListener("online", resync);
+setInterval(() => { if (document.visibilityState === "visible") resync(); }, 60000);
+</script>
 </body>
 </html>

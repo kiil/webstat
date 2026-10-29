@@ -1,6 +1,6 @@
 # webstat: page views from folkets.dk, one event per view, in an xs store.
 #
-#   http-nu :3080 --store ./store --services --trust-proxy 127.0.0.1/32 serve.nu
+#   http-nu :3080 --store ./store --services --datastar --trust-proxy 127.0.0.1/32 serve.nu
 #
 # POST /hit takes the beacon the site sends on every page view (beacon.js),
 # checks it and appends `webstat.<site>.pageview` with the facts in meta. No
@@ -9,11 +9,17 @@
 # once a day and never followed across days.
 #
 # The actor in actors/stats.nu folds the views into today's figures and a
-# history per day; GET / and GET /api/stats read its latest output.
+# history per day; GET / and GET /api/stats read its latest output. The page
+# is live: Datastar opens GET /updates, which sends the board as it stands and
+# then a new board every time the actor writes new figures.
 
 use http-nu/router *
+use http-nu/datastar *
 
 const HERE = (path self .)
+
+# The bundle http-nu 0.18 serves with --datastar.
+const DATASTAR_JS = "/datastar@1.0.4.js"
 
 # Sites that may send views: origin -> site name in the topic.
 const SITES = {
@@ -42,13 +48,14 @@ def today []: nothing -> string {
 # Today's salt, kept in http-nu's in-memory stor only. A restart starts a new
 # salt, so a visitor seen before and after a restart counts twice that day.
 def salt [day: string]: nothing -> string {
-  stor create -t webstat_salt -c {day: str, salt: str} | ignore
+  # `stor create` fails, uncatchably, once the table exists; SQL does not.
   let db = (stor open)
+  $db | query db "create table if not exists webstat_salt (day text, salt text)" | ignore
   let found = ($db | query db "select salt from webstat_salt where day = :d" -p {d: $day})
   if ($found | is-empty) {
     let fresh = (random uuid)
     $db | query db "delete from webstat_salt" | ignore
-    stor insert -t webstat_salt -d {day: $day, salt: $fresh} | ignore
+    $db | query db "insert into webstat_salt (day, salt) values (:d, :s)" -p {d: $day, s: $fresh} | ignore
     $fresh
   } else {
     $found | first | get salt
@@ -91,6 +98,13 @@ def stats []: nothing -> any {
   try { (.last webstat-stats.out).meta } catch { null }
 }
 
+# The board region, rendered from the actor's latest figures.
+def board []: nothing -> string {
+  stats | default {today: null, history: []}
+  | merge {rendered: (date now | date to-timezone Europe/Copenhagen | format date "%H:%M:%S")}
+  | .mj ($HERE | path join "templates" "board.html")
+}
+
 {|req|
   dispatch $req [
     (route {method: "POST", path: "/hit"} {|req ctx|
@@ -121,9 +135,20 @@ def stats []: nothing -> any {
 
     (route {method: "GET", path: "/health"} {|req ctx| "ok" })
 
+    # Live feed: the board as it stands at connect time (so a reconnect
+    # repairs whatever was missed), then one patch per new figure.
+    (route {method: "GET", path: "/updates"} {|req ctx|
+      .cat --follow --new -T "webstat-stats.out"
+      | each {|f| board | to datastar-patch-elements }
+      | prepend (board | to datastar-patch-elements)
+      | to sse
+    })
+
+    # One patch and done, for a page coming back from the background.
+    (route {method: "GET", path: "/refresh"} {|req ctx| board | to datastar-patch-elements | to sse })
+
     (route {method: "GET", path: "/"} {|req ctx|
-      let s = (stats | default {today: null, history: []})
-      $s | .mj ($HERE | path join "templates" "page.html")
+      {board: (board), datastar_js: $DATASTAR_JS} | .mj ($HERE | path join "templates" "page.html")
     })
 
     (route true {|req ctx| "Not found" | status 404 {"Content-Type": "text/plain"} })
