@@ -11,7 +11,7 @@
 <div class="grid">
   <section>
     <h2>Hot lige nu</h2>
-    <table>{% for r in hot %}<tr><td class="p">{{ link(r) }}{% if r.ref %} <small>· {{ r.ref }}</small>{% endif %}</td><td class="n" title="{{ r.views }} {% if r.views == 1 %}visning{% else %}visninger{% endif %} den seneste time">{{ r.score }}</td></tr>{% else %}<tr><td class="empty">Intet den seneste time</td></tr>{% endfor %}</table>
+    <table>{% for r in hot %}<tr><td class="p">{{ link(r) }}{% if r.ref %} <small>· {{ r.ref }}</small>{% endif %}</td><td class="heat h{{ r.flames }}" title="Score {{ r.score }} · {{ r.views }} {% if r.views == 1 %}visning{% else %}visninger{% endif %} den seneste time">{% if r.flames %}{% for i in range(r.flames) %}<i>🔥</i>{% endfor %}{% else %}<i>🔥</i>{% endif %}</td></tr>{% else %}<tr><td class="empty">Intet den seneste time</td></tr>{% endfor %}</table>
 
     <h2>Artikler i dag</h2>
     <table class="cols">

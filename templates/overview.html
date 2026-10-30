@@ -20,7 +20,7 @@
       </div>
       {% if c.days | length > 1 %}<div class="spark" role="img" aria-label="Visninger pr. dag, de seneste {{ c.days | length }} dage">{% for d in c.days %}<i style="height:{{ d.pct }}%" title="{{ d.day }}: {{ d.views }}"></i>{% endfor %}</div>{% endif %}
       {% if c.hot %}<h3>Hot lige nu</h3>
-      <table>{% for r in c.hot %}<tr><td class="p">{{ link(c.base, r) }}</td><td class="n">{{ r.score }}</td></tr>{% endfor %}</table>{% endif %}
+      <table>{% for r in c.hot %}<tr><td class="p">{{ link(c.base, r) }}</td><td class="heat h{{ r.flames }}" title="Score {{ r.score }} · {{ r.views }} {% if r.views == 1 %}visning{% else %}visninger{% endif %} den seneste time">{% if r.flames %}{% for i in range(r.flames) %}<i>🔥</i>{% endfor %}{% else %}<i>🔥</i>{% endif %}</td></tr>{% endfor %}</table>{% endif %}
       <h3>Mest læst i dag</h3>
       <table>{% for r in c.paths %}<tr><td class="p">{{ link(c.base, r) }}</td><td class="n">{{ r.views }}</td></tr>{% else %}<tr><td class="empty">Ingen visninger endnu</td></tr>{% endfor %}</table>
     </article>

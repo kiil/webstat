@@ -18,12 +18,18 @@ export def hot [recent: list, titles: record, now: int, n: int = 10]: nothing ->
       name: $path
       title: ($titles | get -o $path)
       score: ($score | math round --precision 1)
+      flames: (flames $score)
       views: ($views | length)
       ref: (if ($refs | is-empty) { null } else { $refs | first | get value })
     }
   }
   | sort-by score --reverse
   | first $n
+}
+
+# How hot a score looks: 0 below 0.6 (an ember), then one to five flames.
+export def flames [score: number]: nothing -> int {
+  if $score < 0.6 { 0 } else if $score < 1.5 { 1 } else if $score < 3 { 2 } else if $score < 6 { 3 } else if $score < 10 { 4 } else { 5 }
 }
 
 # Views in the last `seconds`.

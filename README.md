@@ -131,6 +131,9 @@ view weighs `0.5 ^ (age / 900)` (a 15-minute half-life) and the weights are
 summed per path; the ten highest make "Hot lige nu". The score is computed at
 render time, so the list cools between views too, and the page's once-a-minute
 refresh keeps it current. `HOT_HALF_LIFE` in `serve.nu` sets the half-life.
+The board shows the score as flames (`flames` in `lib.nu`, also in
+`/api/hot`): a grey ember below 0.6, then one flame from 0.6, two from 1.5,
+three from 3, four from 6 and five from 10; four and five glow and flicker.
 
 ## Events
 

@@ -37,6 +37,20 @@ a{color:inherit}
 nav{display:flex;flex-wrap:wrap;gap:.25rem 1rem;font:.85rem system-ui,sans-serif;margin-bottom:.75rem}
 nav a{color:var(--muted);text-decoration:none}
 nav a[aria-current]{color:var(--ink);font-weight:600;border-bottom:2px solid var(--red)}
+td.heat{text-align:right;white-space:nowrap;width:1%;padding-left:.75rem;line-height:1;font-size:.95rem}
+td.heat i{font-style:normal;display:inline-block;margin-left:-.28em;transform-origin:50% 100%}
+td.heat.h0 i{filter:grayscale(1);opacity:.28;font-size:.8em}
+td.heat i:nth-child(2){font-size:1.08em}
+td.heat i:nth-child(3){font-size:1.16em}
+td.heat i:nth-child(4){font-size:1.24em}
+td.heat i:nth-child(5){font-size:1.32em}
+td.heat.h3 i{filter:drop-shadow(0 0 3px rgba(255,120,0,.35))}
+td.heat.h4 i,td.heat.h5 i{filter:drop-shadow(0 0 5px rgba(255,90,0,.6));animation:flicker 1.6s ease-in-out infinite alternate}
+td.heat.h5 i{filter:drop-shadow(0 0 7px rgba(255,60,0,.85))}
+td.heat i:nth-child(2n){animation-delay:-.5s;animation-duration:1.3s}
+td.heat i:nth-child(3n){animation-delay:-.9s;animation-duration:1.9s}
+@keyframes flicker{0%{transform:scale(1) rotate(-2deg)}40%{transform:scale(1.07,1.12) rotate(1.5deg)}70%{transform:scale(.97,1.03) rotate(-1deg)}100%{transform:scale(1.05,1.1) rotate(2deg)}}
+@media (prefers-reduced-motion:reduce){td.heat i{animation:none!important}}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,18rem),1fr));gap:2rem 1.5rem;align-content:start}
 .card{border-top:3px solid var(--ink);padding-top:.6rem;min-width:0}
 .card h2{font:700 1.15rem Georgia,"Source Serif 4",serif;text-transform:none;letter-spacing:0;color:var(--ink);margin:0 0 .4rem}
