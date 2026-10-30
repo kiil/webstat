@@ -1,0 +1,5 @@
+beacon:
+  js:
+    js/webstat.js: {attributes: {defer: true}}
+  dependencies:
+    - core/drupalSettings

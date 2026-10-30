@@ -1,7 +1,8 @@
 # webstat
 
 Page views, reading depth, time on page and clicks from folkets.dk,
-klimaleksikon.dk and www.climate-encyclopedia.com, as events in an xs store,
+klimaleksikon.dk, www.climate-encyclopedia.com, docujai.com and www.kiils.dk,
+as events in an xs store,
 served by http-nu at `https://webstat.kiil.cross.stream`. The sites are in
 `config.nuon`; the dashboard shows one at a time (`/?site=klimaleksikon`,
 folkets by default).
@@ -20,7 +21,11 @@ folkets by default).
 The collectors live with the sites: folkets.dk's in the folkets repo
 (`tools/folkets/site/nyt.php`), klimaleksikon.dk's in the klimaleksikon repo
 (`tools/drupal/klimaleksikon_webstat/`, with its beacon), each deployed as
-`web/nyt.php`.
+`web/nyt.php`; docujai.com's here in `sites/docujai/` (it has no code repo of
+its own). www.kiils.dk is static (Hugo on GitHub Pages) and has no collector:
+its beacon (`congo/assets/js/webstat.js` in the `kiil/k` repo,
+`~/github-pages/k`) posts straight to `/hit`, so ad blockers may stop some
+views and no visitor is counted.
 
 ## A new site
 
@@ -77,6 +82,11 @@ On klimaleksikon.dk the module `klimaleksikon_webstat` attaches the beacon
 to every page anonymous readers see, and `/nyt.php` forwards as on
 folkets.dk with the same key (both sites run on one hosting account). Its
 clicks are downloads: "Udskriv som PDF" and the teaching sets' PDFs.
+
+On docujai.com the module `docujai_webstat` (`sites/docujai/`, deployed to
+`public_html/modules/custom/`) does the same, and `public_html/nyt.php`
+forwards with the key in `/var/www/docujai.com/.webstat-key`. Clicks are
+contact clicks there and on kiils.dk: the contact page, mail and phone.
 
 ### folkets.dk
 

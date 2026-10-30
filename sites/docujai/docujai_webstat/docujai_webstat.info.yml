@@ -1,0 +1,5 @@
+name: docujAI webstat
+type: module
+description: Page views, reading depth, time on page and contact clicks to webstat (webstat.kiil.cross.stream) through the first-party collector /nyt.php. No cookies.
+core_version_requirement: ^11
+package: docujAI

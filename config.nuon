@@ -34,5 +34,19 @@
       spike: 4
       clicks: "Downloads"
     }
+    docujai: {
+      origins: ["https://docujai.com" "https://www.docujai.com"]
+      base: "https://docujai.com"
+      name: "docujAI"
+      spike: 3
+      clicks: "Kontaktklik"
+    }
+    kiils: {
+      origins: ["https://www.kiils.dk" "https://kiils.dk"]
+      base: "https://www.kiils.dk"
+      name: "Kiils"
+      spike: 3
+      clicks: "Kontaktklik"
+    }
   }
 }

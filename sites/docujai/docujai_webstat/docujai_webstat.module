@@ -1,0 +1,22 @@
+<?php
+
+/**
+ * @file
+ * Puts the webstat beacon (js/webstat.js) on every page readers see on
+ * docujai.com. Admin pages and logged-in users are left out, so only readers
+ * are counted. The beacon posts to /nyt.php, the collector deployed from
+ * ../nyt.php; webstat itself lives in /Users/lk/cross.stream/webstat, and so
+ * does this module's source (sites/docujai/).
+ */
+
+/**
+ * Implements hook_page_attachments().
+ */
+function docujai_webstat_page_attachments(array &$attachments) {
+  $attachments['#cache']['contexts'][] = 'user.roles:authenticated';
+  $attachments['#cache']['contexts'][] = 'route.name';
+  if (\Drupal::currentUser()->isAuthenticated() || \Drupal::service('router.admin_context')->isAdminRoute()) {
+    return;
+  }
+  $attachments['#attached']['library'][] = 'docujai_webstat/beacon';
+}
