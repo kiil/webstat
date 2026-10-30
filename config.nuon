@@ -2,8 +2,37 @@
 # the ntfy topic are secrets: they live in the store (webstat.settings), set
 # with POST /admin/settings, never in this repo.
 {
-  # A path whose hot score reaches this is "taking off" (once a day per path).
-  spike: 6
   # Local hour (Copenhagen) for the morning report on yesterday.
   report_hour: 7
+  # The sites that may send views, by the name used in the topic
+  # (`webstat.<site>.*`). The first is the dashboard's default.
+  #   origins  the pages' origins; a beacon from anywhere else gets 403
+  #   base     where a path on the site is linked to
+  #   name     how the site is named on the board and in ntfy messages
+  #   spike    a path whose hot score reaches this is "taking off" (one
+  #            alert a day per path)
+  #   clicks   what the beacon's click events count on this site
+  sites: {
+    folkets: {
+      origins: ["https://www.folkets.dk" "https://folkets.dk"]
+      base: "https://www.folkets.dk"
+      name: "Folkets"
+      spike: 6
+      clicks: "Støtteklik"
+    }
+    klimaleksikon: {
+      origins: ["https://klimaleksikon.dk" "https://www.klimaleksikon.dk"]
+      base: "https://klimaleksikon.dk"
+      name: "Klimaleksikon"
+      spike: 4
+      clicks: "Downloads"
+    }
+    climate: {
+      origins: ["https://www.climate-encyclopedia.com" "https://climate-encyclopedia.com"]
+      base: "https://www.climate-encyclopedia.com"
+      name: "Climate Encyclopedia"
+      spike: 4
+      clicks: "Downloads"
+    }
+  }
 }

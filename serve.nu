@@ -1,14 +1,15 @@
-# webstat: page views from folkets.dk, as events in an xs store.
+# webstat: page views from folkets.dk and klimaleksikon.dk (the sites in
+# config.nuon), as events in an xs store.
 #
 # Deployed by pushing to cross.stream, which reads the features from
 # cross-stream.nuon. Locally:
 #
 #   http-nu :3080 --store ./store --services --datastar serve.nu
 #
-# POST /hit takes what the beacon on folkets.dk reports, normally through the
-# first-party collector nyt.php on folkets.dk (adblockers leave a site's own
-# requests alone, and PHP sees the reader's IP). Four kinds, each its own
-# topic under `webstat.<site>.`:
+# POST /hit takes what a site's beacon reports, normally through the site's
+# first-party collector nyt.php (adblockers leave a site's own requests
+# alone, and PHP sees the reader's IP). The Origin header names the site.
+# Four kinds, each its own topic under `webstat.<site>.`:
 #
 #   pageview  a page was opened (path, title, node, referrer, device ...)
 #   read      the reader got through 50 or 100 percent of the article
@@ -20,9 +21,11 @@
 # counted once a day and never followed across days.
 #
 # The actor in actors/stats.nu folds the events into today's figures and a
-# history per day; the service in services/alerts.nu sends spike alerts and
-# a morning report. The page is live: Datastar opens GET /updates, which sends
-# the board as it stands and then a new board every time the actor writes.
+# history per day for each site; the service in services/alerts.nu sends
+# spike alerts and a morning report. The page shows one site (`?site=`, the
+# first in config.nuon by default) and is live: Datastar opens GET /updates,
+# which sends the board as it stands and then a new board every time the
+# actor writes.
 
 use http-nu/router *
 use http-nu/datastar *
@@ -39,7 +42,7 @@ def datastar-js []: nothing -> string {
   $env.DATASTAR_JS_PATH? | default $DATASTAR_JS
 }
 
-# The reader's address. The collector on folkets.dk sends it in X-Webstat-Ip
+# The reader's address. A site's collector sends it in X-Webstat-Ip
 # with the shared key; a beacon that comes straight from a browser only has
 # the first X-Forwarded-For entry, which on cross.stream is the proxy's (see
 # internal-ip).
@@ -58,11 +61,6 @@ def internal-ip [ip: string]: nothing -> bool {
   $ip == "" or ($ip =~ '^(10\.|127\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|::1$|f[cd][0-9a-f]{2}:)')
 }
 
-# Sites that may send views: origin -> site name in the topic.
-const SITES = {
-  "https://www.folkets.dk": "folkets"
-  "https://folkets.dk": "folkets"
-}
 
 # The same self-declared bots folkets_counter drops.
 const BOT = '(?i)bot|crawl|spider|slurp|externalhit|externalagent|curl|python|wget|headless|monitor|preview|scan|http|java|okhttp|axios|feed|rss|lighthouse|semrush|ahrefs|gpt|claude|perplexity|bytespider|petal|yandex|baidu'
@@ -78,6 +76,21 @@ try {
 }
 
 def settings []: nothing -> record { open $CONFIG }
+
+# The sites in config.nuon: name -> {origins, base, name, spike, clicks}.
+def sites []: nothing -> record { settings | get sites }
+
+# The site an origin belongs to, or null.
+def site-of [origin: string]: nothing -> any {
+  sites | transpose site s | where {|r| $origin in $r.s.origins } | get -o 0.site
+}
+
+# The site a dashboard request asks for: `?site=`, else the first one.
+def site-asked [req: record]: nothing -> string {
+  let asked = ($req.query? | default {} | get -o site)
+  let names = (sites | columns)
+  if $asked in $names { $asked } else { $names | first }
+}
 
 # The secrets: the collector key and the ntfy topic. They live in the store,
 # never in git; POST /admin/settings sets them (see the route).
@@ -177,15 +190,16 @@ def report []: any -> any {
   }
 }
 
-def stats []: nothing -> any {
-  try { (.last webstat-stats.out).meta } catch { null }
+# One site's figures from the actor's latest summary, or null.
+def stats [site: string]: nothing -> any {
+  try { (.last webstat-stats.out).meta | get -o sites | get -o $site } catch { null }
 }
 
 def now-seconds []: nothing -> int { (date now | into int) // 1_000_000_000 }
 
-# The view-model for the board; layout is in templates/board.html.
-def board-data []: nothing -> record {
-  let s = (stats | default {today: null, history: []})
+# The view-model for a site's board; layout is in templates/board.html.
+def board-data [site: string]: nothing -> record {
+  let s = (stats $site | default {today: null, history: []})
   let now = (now-seconds)
   let recent = ($s | get -o recent | default [])
   let titles = ($s | get -o today.titles | default {})
@@ -197,11 +211,12 @@ def board-data []: nothing -> record {
     })
     articles: ($s | get -o today.articles | default [] | each {|a| $a | merge {time: (clock $a.median)} })
     rendered: (date now | date to-timezone Europe/Copenhagen | format date "%H:%M:%S")
+    site: ((sites | get $site) | insert id $site)
   }
 }
 
-def board []: nothing -> string {
-  board-data | .mj ($HERE | path join "templates" "board.html")
+def board [site: string]: nothing -> string {
+  board-data $site | .mj ($HERE | path join "templates" "board.html")
 }
 
 {|req|
@@ -210,7 +225,7 @@ def board []: nothing -> string {
       # The body first, before anything else touches the pipeline.
       let r = (report)
       let origin = ($req.headers | get -o origin | default "")
-      let site = ($SITES | get -o $origin)
+      let site = (site-of $origin)
       let ua = ($req.headers | get -o user-agent | default "")
       let key = (secrets | get -o key | default "")
       let keyed = $key != "" and (($req.headers | get -o x-webstat-key | default "") == $key)
@@ -235,11 +250,11 @@ def board []: nothing -> string {
       }
     })
 
-    # The hot list for folkets.dk's own block (fetched through nyt.php):
-    # articles only (a headline, not the front page or /abonnent) with a
-    # score of at least 0.5, about one view in the last half hour.
+    # The hot list for a site's own block (folkets.dk fetches it through
+    # nyt.php): articles only (a headline, not the front page or /abonnent)
+    # with a score of at least 0.5, about one view in the last half hour.
     (route {method: "GET", path: "/api/hot"} {|req ctx|
-      let s = (stats | default {})
+      let s = (stats (site-asked $req) | default {})
       hot ($s | get -o recent | default []) ($s | get -o today.titles | default {}) (now-seconds) 20
       | where {|h| $h.score >= 0.5 and $h.title != null and $h.name != "/" and not ($h.name starts-with "/abonnent") and not ($h.name starts-with "/webstat-test") }
       | first 5
@@ -268,7 +283,7 @@ def board []: nothing -> string {
     })
 
     (route {method: "GET", path: "/api/stats"} {|req ctx|
-      stats | default {} | to json | metadata set --content-type "application/json"
+      stats (site-asked $req) | default {} | to json | metadata set --content-type "application/json"
     })
 
     (route {method: "GET", path: "/health"} {|req ctx| "ok" })
@@ -288,17 +303,24 @@ def board []: nothing -> string {
     # Live feed: the board as it stands at connect time (so a reconnect
     # repairs whatever was missed), then one patch per new figure.
     (route {method: "GET", path: "/updates"} {|req ctx|
+      let site = (site-asked $req)
       .cat --follow --new -T "webstat-stats.out"
-      | each {|f| board | to datastar-patch-elements }
-      | prepend (board | to datastar-patch-elements)
+      | each {|f| board $site | to datastar-patch-elements }
+      | prepend (board $site | to datastar-patch-elements)
       | to sse
     })
 
     # One patch and done, for a page coming back from the background.
-    (route {method: "GET", path: "/refresh"} {|req ctx| board | to datastar-patch-elements | to sse })
+    (route {method: "GET", path: "/refresh"} {|req ctx| board (site-asked $req) | to datastar-patch-elements | to sse })
 
     (route {method: "GET", path: "/"} {|req ctx|
-      {board: (board), datastar_js: (datastar-js)} | .mj ($HERE | path join "templates" "page.html")
+      let site = (site-asked $req)
+      {
+        board: (board $site)
+        site: $site
+        sites: (sites | transpose id s | each {|r| {id: $r.id, name: $r.s.name} })
+        datastar_js: (datastar-js)
+      } | .mj ($HERE | path join "templates" "page.html")
     })
 
     (route true {|req ctx| "Not found" | status 404 {"Content-Type": "text/plain"} })

@@ -34,11 +34,15 @@ a{color:inherit}
 .live{display:inline-block;width:.55rem;height:.55rem;border-radius:50%;background:#2E9E5B;margin-right:.35rem;vertical-align:middle;animation:pulse 2s infinite}
 @keyframes pulse{50%{opacity:.35}}
 .empty{color:var(--muted)}
+nav{display:flex;flex-wrap:wrap;gap:.25rem 1rem;font:.85rem system-ui,sans-serif;margin-bottom:.75rem}
+nav a{color:var(--muted);text-decoration:none}
+nav a[aria-current]{color:var(--ink);font-weight:600;border-bottom:2px solid var(--red)}
 </style>
 </head>
-<body data-init="@get('/updates')" data-on:refresh="@get('/refresh')">
+<body data-init="@get('/updates?site={{ site }}')" data-on:refresh="@get('/refresh?site={{ site }}')">
 <main>
 <h1>Webstat</h1>
+{% if sites | length > 1 %}<nav>{% for s in sites %}<a href="/?site={{ s.id }}"{% if s.id == site %} aria-current="page"{% endif %}>{{ s.name }}</a>{% endfor %}</nav>{% endif %}
 {{ board | safe }}
 </main>
 <script>

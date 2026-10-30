@@ -1,12 +1,12 @@
-{%- macro link(r) -%}<a href="https://www.folkets.dk{{ r.name | e }}" target="_blank" rel="noreferrer">{{ r.title or r.name }}</a>{%- endmacro -%}
+{%- macro link(r) -%}<a href="{{ site.base }}{{ r.name | e }}" target="_blank" rel="noreferrer">{{ r.title or r.name }}</a>{%- endmacro -%}
 <div id="board">
-<div class="sub"><span class="live"></span>folkets.dk · live{% if today %} · {{ today.day }}{% endif %} · {{ rendered }}</div>
+<div class="sub"><span class="live"></span>{{ site.name }} · live{% if today %} · {{ today.day }}{% endif %} · {{ rendered }}</div>
 {% if today %}
 <div class="tiles">
   <div class="tile"><b>{{ now }}</b><span>Visninger de sidste 5 min.</span></div>
   <div class="tile"><b>{{ today.views }}</b><span>Visninger i dag</span></div>
   <div class="tile"><b>{% if today.visitors %}{{ today.visitors }}{% else %}–{% endif %}</b><span>Besøgende i dag</span></div>
-  <div class="tile"><b>{{ today.clicks }}</b><span>Støtteklik i dag</span></div>
+  <div class="tile"><b>{{ today.clicks }}</b><span>{{ site.clicks }} i dag</span></div>
 </div>
 <div class="grid">
   <section>
@@ -15,7 +15,7 @@
 
     <h2>Artikler i dag</h2>
     <table class="cols">
-      <tr><th>Artikel</th><th title="Visninger">Vis.</th><th title="Andel der nåede halvvejs">½</th><th title="Andel der læste færdig">Færdig</th><th title="Median tid med siden fremme">Tid</th><th title="Støtteklik fra artiklen">Støt</th></tr>
+      <tr><th>Artikel</th><th title="Visninger">Vis.</th><th title="Andel der nåede halvvejs">½</th><th title="Andel der læste færdig">Færdig</th><th title="Median tid med siden fremme">Tid</th><th title="{{ site.clicks }} fra siden">Klik</th></tr>
       {% for a in articles %}<tr><td class="p">{{ link(a) }}</td><td class="n">{{ a.views }}</td><td class="n">{{ a.read50 }} %</td><td class="n">{{ a.read100 }} %</td><td class="n">{{ a.time or "–" }}</td><td class="n">{{ a.clicks or "" }}</td></tr>
       {% else %}<tr><td class="empty" colspan="6">Ingen artikler endnu</td></tr>{% endfor %}
     </table>
@@ -30,7 +30,7 @@
     <h2>Henvisninger</h2>
     <table>{% for r in today.refs %}<tr><td class="p">{{ r.name }}</td><td class="n">{{ r.views }}</td></tr>{% else %}<tr><td class="empty">Ingen endnu</td></tr>{% endfor %}</table>
 
-    <h2>Støtte</h2>
+    <h2>{{ site.clicks }}</h2>
     <table>
       {% for r in today.click_targets %}<tr><td class="p">{{ r.name }}</td><td class="n">{{ r.views }}</td></tr>{% else %}<tr><td class="empty">Ingen klik endnu</td></tr>{% endfor %}
     </table>
@@ -50,7 +50,7 @@
 {% if history %}
 <h2>Tidligere dage</h2>
 <table class="cols">
-  <tr><th>Dag</th><th>Mest læst</th><th>Besøg.</th><th>Vis.</th><th>Støt</th></tr>
+  <tr><th>Dag</th><th>Mest læst</th><th>Besøg.</th><th>Vis.</th><th>Klik</th></tr>
   {% for d in history %}<tr><td class="t">{{ d.day }}</td><td class="p">{% if d.top %}{{ link(d.top[0]) }}{% endif %}</td><td class="n">{% if d.visitors %}{{ d.visitors }}{% else %}–{% endif %}</td><td class="n">{{ d.views }}</td><td class="n">{{ d.clicks or "" }}</td></tr>{% endfor %}
 </table>
 {% endif %}

@@ -1,22 +1,32 @@
 # webstat
 
-Page views, reading depth, time on page and support clicks from folkets.dk,
-as events in an xs store, served by http-nu at
-`https://webstat.kiil.cross.stream`.
+Page views, reading depth, time on page and clicks from folkets.dk,
+klimaleksikon.dk and www.climate-encyclopedia.com, as events in an xs store,
+served by http-nu at `https://webstat.kiil.cross.stream`. The sites are in
+`config.nuon`; the dashboard shows one at a time (`/?site=klimaleksikon`,
+folkets by default).
 
 | File | Role |
 | --- | --- |
-| `serve.nu` | http-nu handler: `POST /hit` (events), `GET /` (live dashboard), `GET /updates` and `GET /refresh` (Datastar SSE), `GET /api/hot`, `GET /api/stats`, `GET /health`, `GET /whoami` |
+| `serve.nu` | http-nu handler: `POST /hit` (events), `GET /` (live dashboard), `GET /updates` and `GET /refresh` (Datastar SSE), `GET /api/hot`, `GET /api/stats`, `GET /health`, `GET /whoami`; all but `/hit` take `?site=` |
 | `lib.nu` | hot score and small helpers shared by the handler and the service |
-| `actors/stats.nu` | folds the events into today's figures and a history per day, written to `webstat-stats.out` |
+| `actors/stats.nu` | folds the events into today's figures and a history per day for each site, written to `webstat-stats.out` (`sites.<site>`) |
 | `services/alerts.nu` | spike alerts and the morning report via ntfy |
 | `templates/page.html`, `templates/board.html` | the dashboard shell and the region `#board` that Datastar patches (minijinja) |
 | `beacon.js` | the script for folkets.dk's palette block |
-| `config.nuon` | the spike threshold and the report hour (no secrets) |
+| `config.nuon` | the sites (origins, link base, name, spike threshold, what clicks count) and the report hour (no secrets) |
 | `secrets.nuon` | local only, gitignored: the collector key and the ntfy topic, sent once with `POST /admin/settings` |
 
-The collector itself lives in the folkets repo
-(`tools/folkets/site/nyt.php`, deployed as `web/nyt.php`).
+The collectors live with the sites: folkets.dk's in the folkets repo
+(`tools/folkets/site/nyt.php`), klimaleksikon.dk's in the klimaleksikon repo
+(`tools/drupal/klimaleksikon_webstat/`, with its beacon), each deployed as
+`web/nyt.php`.
+
+## A new site
+
+Add it to `sites` in `config.nuon` (the origins must match the pages'
+`Origin` exactly) and push; a beacon from an origin not listed gets 403.
+Then give the site a collector like `nyt.php` that knows the key.
 
 ## Run
 
@@ -61,7 +71,14 @@ visibility, `pageshow`, `online`, and once a minute while visible) it calls
 `GET /refresh` for one patch, because a stream can die without an error. If
 Caddy buffers responses, turn that off for `/updates` or nothing arrives.
 
-## Collector on folkets.dk
+## Collectors
+
+On klimaleksikon.dk the module `klimaleksikon_webstat` attaches the beacon
+to every page anonymous readers see, and `/nyt.php` forwards as on
+folkets.dk with the same key (both sites run on one hosting account). Its
+clicks are downloads: "Udskriv som PDF" and the teaching sets' PDFs.
+
+### folkets.dk
 
 The beacon posts to `/nyt.php` on folkets.dk, not to this host: ad blockers
 leave a site's own requests alone, and PHP sees the reader's address
@@ -74,11 +91,12 @@ name the IP. `GET /nyt.php?hot` serves `/api/hot`, cached for a minute, to the
 
 ## Alerts and morning report
 
-`services/alerts.nu` checks once a minute. A path whose hot score reaches
-`spike` gets one ntfy message a day ("Tager fart: …", with the main referrer
+`services/alerts.nu` checks every site once a minute. A path whose hot score
+reaches the site's `spike` gets one ntfy message a day ("Tager fart: …", with the main referrer
 and a link); `webstat.alert` frames record what was sent. After
 `report_hour` (Copenhagen) it sends one report on yesterday: views, visitors,
-support clicks and the top five (`webstat.report` frames). Subscribe to the
+clicks and the top five, one per site (`webstat.report` frames; both kinds
+carry `site`, and frames from before that belong to folkets). Subscribe to the
 topic in the ntfy app; anyone who knows the topic can read it.
 
 ## Secrets
@@ -114,11 +132,11 @@ All under `webstat.<site>.`, empty body, the facts in meta; every event has
 | `pageview` | `title` (the page's h1), `nid`, `type` (`node--type-*`), `ref` (another site's host), `from` (the path on folkets.dk the reader came from), `device` (`mobile` < 768 px, `tablet` < 1200 px, `desktop`), `lang`, `browser`, `system` (coarse, from the user agent), `visitor` |
 | `read` | `depth`: 50 when half the article body has been on screen, 100 at 95 percent |
 | `leave` | `seconds` the page was visible, sent each time it is hidden; the latest per view counts |
-| `click` | `target`: the path and query of an `/abonnent` or `/stot` link, or `stripe` |
+| `click` | `target`: on folkets.dk the path and query of an `/abonnent` or `/stot` link, or `stripe`; on klimaleksikon.dk the path of a PDF |
 
 `visitor` is the first 16 hex of sha256(salt, IP, user agent), only when
 the IP is a public address. The server accepts events only from the origins
-in `SITES` (others get 403), drops self-declared bots, prefetches and
+in `config.nuon` (others get 403), drops self-declared bots, prefetches and
 malformed bodies (204, nothing stored), and stores no IP address or user
 agent. The salt lives in http-nu's in-memory `stor` and changes every day.
 
