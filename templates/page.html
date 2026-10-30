@@ -37,12 +37,24 @@ a{color:inherit}
 nav{display:flex;flex-wrap:wrap;gap:.25rem 1rem;font:.85rem system-ui,sans-serif;margin-bottom:.75rem}
 nav a{color:var(--muted);text-decoration:none}
 nav a[aria-current]{color:var(--ink);font-weight:600;border-bottom:2px solid var(--red)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,18rem),1fr));gap:2rem 1.5rem;align-content:start}
+.card{border-top:3px solid var(--ink);padding-top:.6rem;min-width:0}
+.card h2{font:700 1.15rem Georgia,"Source Serif 4",serif;text-transform:none;letter-spacing:0;color:var(--ink);margin:0 0 .4rem}
+.card h2 a{text-decoration:none}
+.card h3{font:700 .7rem system-ui,sans-serif;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin:.9rem 0 .3rem}
+.card table{margin-bottom:0;font-size:.9rem}
+.figs{display:flex;flex-wrap:wrap;gap:.2rem 1rem;color:var(--muted);font:.8rem system-ui,sans-serif}
+.figs b{color:var(--ink);font:600 1.05rem system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.spark{display:flex;align-items:flex-end;gap:2px;height:2.2rem;margin-top:.7rem}
+.spark i{flex:1;max-width:1rem;background:var(--rule);border-radius:1px 1px 0 0;min-height:2px}
+.spark i:last-child{background:var(--red)}
 </style>
 </head>
-<body data-init="@get('/updates?site={{ site }}')" data-on:refresh="@get('/refresh?site={{ site }}')">
+{%- set q = "?site=" ~ site if site else "" -%}
+<body data-init="@get('/updates{{ q }}')" data-on:refresh="@get('/refresh{{ q }}')">
 <main>
 <h1>Webstat</h1>
-{% if sites | length > 1 %}<nav>{% for s in sites %}<a href="/?site={{ s.id }}"{% if s.id == site %} aria-current="page"{% endif %}>{{ s.name }}</a>{% endfor %}</nav>{% endif %}
+{% if sites | length > 1 %}<nav><a href="/"{% if not site %} aria-current="page"{% endif %}>Alle</a>{% for s in sites %}<a href="/?site={{ s.id }}"{% if s.id == site %} aria-current="page"{% endif %}>{{ s.name }}</a>{% endfor %}</nav>{% endif %}
 {{ board | safe }}
 </main>
 <script>

@@ -4,8 +4,9 @@ Page views, reading depth, time on page and clicks from folkets.dk,
 klimaleksikon.dk, www.climate-encyclopedia.com, docujai.com and www.kiils.dk,
 as events in an xs store,
 served by http-nu at `https://webstat.kiil.cross.stream`. The sites are in
-`config.nuon`; the dashboard shows one at a time (`/?site=klimaleksikon`,
-folkets by default).
+`config.nuon`. The dashboard's front page shows them all side by side
+(today's figures, what is hot, the most read, the last 14 days and one live
+feed); `/?site=klimaleksikon` shows one site in full.
 
 | File | Role |
 | --- | --- |
@@ -13,7 +14,7 @@ folkets by default).
 | `lib.nu` | hot score and small helpers shared by the handler and the service |
 | `actors/stats.nu` | folds the events into today's figures and a history per day for each site, written to `webstat-stats.out` (`sites.<site>`) |
 | `services/alerts.nu` | spike alerts and the morning report via ntfy |
-| `templates/page.html`, `templates/board.html` | the dashboard shell and the region `#board` that Datastar patches (minijinja) |
+| `templates/page.html`, `templates/board.html`, `templates/overview.html` | the dashboard shell and the region `#board` that Datastar patches (minijinja): one site, or all of them |
 | `beacon.js` | the script for folkets.dk's palette block |
 | `config.nuon` | the sites (origins, link base, name, spike threshold, what clicks count) and the report hour (no secrets) |
 | `secrets.nuon` | local only, gitignored: the collector key and the ntfy topic, sent once with `POST /admin/settings` |

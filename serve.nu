@@ -22,10 +22,10 @@
 #
 # The actor in actors/stats.nu folds the events into today's figures and a
 # history per day for each site; the service in services/alerts.nu sends
-# spike alerts and a morning report. The page shows one site (`?site=`, the
-# first in config.nuon by default) and is live: Datastar opens GET /updates,
-# which sends the board as it stands and then a new board every time the
-# actor writes.
+# spike alerts and a morning report. The page shows every site side by side
+# (the overview), or one site with `?site=`, and is live: Datastar opens
+# GET /updates, which sends the board as it stands and then a new board
+# every time the actor writes.
 
 use http-nu/router *
 use http-nu/datastar *
@@ -90,6 +90,12 @@ def site-asked [req: record]: nothing -> string {
   let asked = ($req.query? | default {} | get -o site)
   let names = (sites | columns)
   if $asked in $names { $asked } else { $names | first }
+}
+
+# The board a page asks for: a site's name, or null for the overview.
+def board-asked [req: record]: nothing -> any {
+  let asked = ($req.query? | default {} | get -o site)
+  if $asked in (sites | columns) { $asked } else { null }
 }
 
 # The secrets: the collector key and the ntfy topic. They live in the store,
@@ -215,8 +221,57 @@ def board-data [site: string]: nothing -> record {
   }
 }
 
-def board [site: string]: nothing -> string {
-  board-data $site | .mj ($HERE | path join "templates" "board.html")
+# The view-model for the overview: every site's figures for today, what is
+# hot, the most read, the last 14 days and one feed for all; layout is in
+# templates/overview.html.
+def overview-data []: nothing -> record {
+  let all = (try { (.last webstat-stats.out).meta | get -o sites | default {} } catch { {} })
+  let now = (now-seconds)
+  let cards = (sites | transpose id conf | each {|r|
+    let s = ($all | get -o $r.id | default {})
+    let t = ($s | get -o today)
+    let recent = ($s | get -o recent | default [])
+    let days = ($s | get -o history | default [] | first 13 | reverse
+      | append (if $t == null { [] } else { [{day: $t.day, views: $t.views}] }))
+    let top = ($days | get -o views | append 1 | math max)
+    {
+      id: $r.id
+      name: $r.conf.name
+      base: $r.conf.base
+      clicks_label: $r.conf.clicks
+      now: (recent-count $recent $now 300)
+      views: ($t | get -o views | default 0)
+      visitors: ($t | get -o visitors | default 0)
+      clicks: ($t | get -o clicks | default 0)
+      hot: (hot $recent ($t | get -o titles | default {}) $now 3)
+      paths: ($t | get -o paths | default [] | first 3)
+      days: ($days | each {|d| {day: $d.day, views: $d.views, pct: ([($d.views * 100 // $top) 2] | math max)} })
+    }
+  })
+  let feed = ($cards | each {|c|
+    $all | get -o $c.id | get -o feed | default [] | each {|f| $f | merge {site: $c.name, base: $c.base} }
+  } | flatten | sort-by ts --reverse | first 20 | each {|f|
+    $f | merge {time: ($f.ts * 1_000_000_000 | into datetime | date to-timezone Europe/Copenhagen | format date "%H:%M")}
+  })
+  {
+    cards: $cards
+    feed: $feed
+    total: {
+      now: ($cards | get now | math sum)
+      views: ($cards | get views | math sum)
+      visitors: ($cards | get visitors | math sum)
+    }
+    rendered: (date now | date to-timezone Europe/Copenhagen | format date "%H:%M:%S")
+  }
+}
+
+# A site's board, or the overview when site is null.
+def board [site: any]: nothing -> string {
+  if $site == null {
+    overview-data | .mj ($HERE | path join "templates" "overview.html")
+  } else {
+    board-data $site | .mj ($HERE | path join "templates" "board.html")
+  }
 }
 
 {|req|
@@ -303,7 +358,7 @@ def board [site: string]: nothing -> string {
     # Live feed: the board as it stands at connect time (so a reconnect
     # repairs whatever was missed), then one patch per new figure.
     (route {method: "GET", path: "/updates"} {|req ctx|
-      let site = (site-asked $req)
+      let site = (board-asked $req)
       .cat --follow --new -T "webstat-stats.out"
       | each {|f| board $site | to datastar-patch-elements }
       | prepend (board $site | to datastar-patch-elements)
@@ -311,10 +366,10 @@ def board [site: string]: nothing -> string {
     })
 
     # One patch and done, for a page coming back from the background.
-    (route {method: "GET", path: "/refresh"} {|req ctx| board (site-asked $req) | to datastar-patch-elements | to sse })
+    (route {method: "GET", path: "/refresh"} {|req ctx| board (board-asked $req) | to datastar-patch-elements | to sse })
 
     (route {method: "GET", path: "/"} {|req ctx|
-      let site = (site-asked $req)
+      let site = (board-asked $req)
       {
         board: (board $site)
         site: $site

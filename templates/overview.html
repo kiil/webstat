@@ -1,0 +1,34 @@
+{%- macro link(base, r) -%}<a href="{{ base }}{{ r.name | e }}" target="_blank" rel="noreferrer">{{ r.title or r.name }}</a>{%- endmacro -%}
+<div id="board">
+<div class="sub"><span class="live"></span>Alle sites · live · {{ rendered }}</div>
+<div class="tiles">
+  <div class="tile"><b>{{ total.now }}</b><span>Visninger de sidste 5 min.</span></div>
+  <div class="tile"><b>{{ total.views }}</b><span>Visninger i dag</span></div>
+  <div class="tile"><b>{% if total.visitors %}{{ total.visitors }}{% else %}–{% endif %}</b><span>Besøgende i dag</span></div>
+  <div class="tile"><b>{{ cards | length }}</b><span>Sites</span></div>
+</div>
+<div class="grid">
+  <section class="cards">
+    {% for c in cards %}
+    <article class="card">
+      <h2><a href="/?site={{ c.id }}">{{ c.name }}</a></h2>
+      <div class="figs">
+        <span><b>{{ c.now }}</b> nu</span>
+        <span><b>{{ c.views }}</b> i dag</span>
+        <span><b>{% if c.visitors %}{{ c.visitors }}{% else %}–{% endif %}</b> besøgende</span>
+        <span><b>{{ c.clicks }}</b> {{ c.clicks_label | lower }}</span>
+      </div>
+      {% if c.days | length > 1 %}<div class="spark" role="img" aria-label="Visninger pr. dag, de seneste {{ c.days | length }} dage">{% for d in c.days %}<i style="height:{{ d.pct }}%" title="{{ d.day }}: {{ d.views }}"></i>{% endfor %}</div>{% endif %}
+      {% if c.hot %}<h3>Hot lige nu</h3>
+      <table>{% for r in c.hot %}<tr><td class="p">{{ link(c.base, r) }}</td><td class="n">{{ r.score }}</td></tr>{% endfor %}</table>{% endif %}
+      <h3>Mest læst i dag</h3>
+      <table>{% for r in c.paths %}<tr><td class="p">{{ link(c.base, r) }}</td><td class="n">{{ r.views }}</td></tr>{% else %}<tr><td class="empty">Ingen visninger endnu</td></tr>{% endfor %}</table>
+    </article>
+    {% endfor %}
+  </section>
+  <section>
+    <h2>Live</h2>
+    <table>{% for f in feed %}<tr><td class="n t">{{ f.time }}</td><td class="p">{{ link(f.base, {"name": f.path, "title": f.title}) }} <small>· {{ f.site }}{% if f.ref %} · {{ f.ref }}{% endif %}</small></td></tr>{% else %}<tr><td class="empty">Venter på læsere</td></tr>{% endfor %}</table>
+  </section>
+</div>
+</div>
