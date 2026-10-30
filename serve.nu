@@ -221,9 +221,9 @@ def board-data [site: string]: nothing -> record {
   }
 }
 
-# The view-model for the overview: every site's figures for today, what is
-# hot, the most read, the last 14 days and one feed for all; layout is in
-# templates/overview.html.
+# The view-model for the overview: one hot list and one feed for all sites,
+# and every site's figures for today, the most read and the last 14 days;
+# layout is in templates/overview.html.
 def overview-data []: nothing -> record {
   let all = (try { (.last webstat-stats.out).meta | get -o sites | default {} } catch { {} })
   let now = (now-seconds)
@@ -243,7 +243,7 @@ def overview-data []: nothing -> record {
       views: ($t | get -o views | default 0)
       visitors: ($t | get -o visitors | default 0)
       clicks: ($t | get -o clicks | default 0)
-      hot: (hot $recent ($t | get -o titles | default {}) $now 3)
+      hot: (hot $recent ($t | get -o titles | default {}) $now 10)
       paths: ($t | get -o paths | default [] | first 3)
       days: ($days | each {|d| {day: $d.day, views: $d.views, pct: ([($d.views * 100 // $top) 2] | math max)} })
     }
@@ -253,8 +253,12 @@ def overview-data []: nothing -> record {
   } | flatten | sort-by ts --reverse | first 20 | each {|f|
     $f | merge {time: ($f.ts * 1_000_000_000 | into datetime | date to-timezone Europe/Copenhagen | format date "%H:%M")}
   })
+  let hot = ($cards | each {|c|
+    $c.hot | each {|h| $h | merge {base: $c.base, domain: ($c.base | str replace -r '^https?://(www\.)?' '')} }
+  } | flatten | sort-by score --reverse | first 10)
   {
-    cards: $cards
+    cards: ($cards | reject hot)
+    hot: $hot
     feed: $feed
     total: {
       now: ($cards | get now | math sum)

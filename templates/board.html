@@ -1,4 +1,4 @@
-{%- macro link(r) -%}<a href="{{ site.base }}{{ r.name | e }}" target="_blank" rel="noreferrer">{{ r.title or r.name }}</a>{%- endmacro -%}
+{%- macro link(r) -%}<a href="{{ site.base }}{{ r.name | e }}" target="_blank" rel="noreferrer">{{ r.title or ("Forsiden" if r.name == "/" else r.name) }}</a>{%- endmacro -%}
 <div id="board">
 <div class="sub"><span class="live"></span>{{ site.name }} · live{% if today %} · {{ today.day }}{% endif %} · {{ rendered }}</div>
 {% if today %}
