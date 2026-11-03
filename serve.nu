@@ -150,6 +150,52 @@ def site-path [v: any]: nothing -> any {
   if $p != null and ($p starts-with "/") { $p } else { null }
 }
 
+def int-in [v: any, lo: int, hi: int]: nothing -> bool {
+  ($v | describe) == "int" and $v >= $lo and $v <= $hi
+}
+
+# A front page teaser [path, module, place, headline?]: the module is one
+# letter (f the showcase, k Kort nyt, a the archive bands, u Ugens
+# eftertragtede, h Hot lige nu), the place counts from 1 within it. Null when
+# malformed.
+def teaser [s: any]: nothing -> any {
+  if not ($s | describe | str starts-with "list") or ($s | length) not-in [3 4] { return null }
+  let p = (site-path ($s | get 0))
+  let mod = ($s | get 1)
+  let pos = ($s | get 2)
+  let title = (text ($s | get -o 3) 200)
+  if $p == null or $p == "/" or $mod not-in [f k a u h] or not (int-in $pos 1 99) { null } else { [$p $mod $pos $title] | compact }
+}
+
+# Where a reader rested and stopped in an article, from a leave report:
+#   depth  how far down the body the reader got, percent
+#   at     where the reading line last rested, percent
+#   rest   seconds resting in each 5 percent band of the body (20 numbers)
+#   marks  landmarks in the body: [kind, position percent, label, seconds in
+#          view while resting, clicked into (1/0)]; kinds v video, e other
+#          embed, i image, q quote, t table, h subheading, a audio
+# Fields that do not check out are left out.
+def attention [b: record]: nothing -> record {
+  let depth = ($b | get -o depth)
+  let at = ($b | get -o at)
+  let rest = ($b | get -o rest)
+  let marks = ($b | get -o marks)
+  let rest_ok = ($rest | describe | str starts-with "list") and ($rest | length) == 20 and ($rest | all {|x| int-in $x 0 7200 })
+  let marks_ok = (if ($marks | describe | str starts-with "list") {
+    $marks | first 12 | each {|k|
+      if ($k | describe | str starts-with "list") and ($k | length) == 5 and ($k.0 in [v e i q t h a]) and (int-in $k.1 0 100) and (int-in $k.3 0 7200) and ($k.4 in [0 1]) {
+        [$k.0 $k.1 (text $k.2 40 | default "") $k.3 $k.4]
+      } else { null }
+    } | compact
+  } else { [] })
+  {
+    depth: (if (int-in $depth 0 100) { $depth } else { null })
+    at: (if (int-in $at 0 100) { $at } else { null })
+    rest: (if $rest_ok { $rest } else { null })
+    marks: (if ($marks_ok | is-empty) { null } else { $marks_ok })
+  } | compact
+}
+
 # The beacon's report, checked and trimmed: {kind, meta} or null when it is
 # not something to store. `from json` can hand back a string for garbage, so
 # the type is checked, not just caught.
@@ -186,7 +232,20 @@ def report []: any -> any {
     }
     "leave" => {
       let s = ($b | get -o seconds)
-      if ($s | describe) == "int" and $s >= 1 and $s <= 7200 { {kind: "leave", meta: ($common | merge {seconds: $s})} } else { null }
+      if ($s | describe) == "int" and $s >= 1 and $s <= 7200 {
+        {kind: "leave", meta: ($common | merge {seconds: $s} | merge (attention $b))}
+      } else { null }
+    }
+    "teasers" => {
+      let seen = ($b | get -o seen)
+      if ($seen | describe | str starts-with "list") {
+        let ok = ($seen | first 80 | each {|s| teaser $s } | compact)
+        if ($ok | is-empty) { null } else { {kind: "teasers", meta: ($common | merge {seen: $ok})} }
+      } else { null }
+    }
+    "tclick" => {
+      let t = (teaser [($b | get -o target) ($b | get -o mod) ($b | get -o pos)])
+      if $t == null { null } else { {kind: "tclick", meta: ($common | merge {target: $t.0, mod: $t.1, pos: $t.2})} }
     }
     "click" => {
       let target = (text ($b | get -o target) 200)

@@ -64,6 +64,22 @@ small.dom{margin-left:.3rem;opacity:.75;white-space:nowrap}
 .spark{display:flex;align-items:flex-end;gap:2px;height:2.2rem;margin-top:.7rem}
 .spark i{flex:1;max-width:1rem;background:var(--rule);border-radius:1px 1px 0 0;min-height:2px}
 .spark i:last-child{background:var(--red)}
+.note{color:var(--muted);font:.78rem/1.4 system-ui,sans-serif;margin:-.2rem 0 1rem}
+.att{margin-bottom:1.6rem}
+.att-head{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;margin-bottom:.3rem}
+.att-head small{white-space:nowrap}
+.att-marks{position:relative;height:1.15rem}
+.att-marks i{position:absolute;transform:translateX(-50%);font:600 .72rem/1 system-ui,sans-serif;font-style:normal;color:var(--muted);cursor:help;bottom:.15rem}
+.att-marks i.brake{color:var(--red);font-size:.9rem}
+.att-heat{display:flex;height:.9rem;border-radius:2px;overflow:hidden;background:var(--rule)}
+.att-heat i{flex:1;background:var(--red)}
+.att-heat .h0{opacity:0}.att-heat .h1{opacity:.15}.att-heat .h2{opacity:.32}.att-heat .h3{opacity:.5}.att-heat .h4{opacity:.72}.att-heat .h5{opacity:1}
+.att-exit{display:flex;align-items:flex-start;gap:1px;height:1.4rem;margin-top:2px}
+.att-exit i{flex:1;background:var(--muted);opacity:.55;border-radius:0 0 1px 1px}
+.brake-note{font:.82rem/1.4 system-ui,sans-serif;margin:.35rem 0 0;color:var(--ink)}
+table.mods{max-width:26rem}
+table.cols td.n{white-space:nowrap}
+@media (max-width:600px){table.cols th:nth-child(n+7),table.cols td:nth-child(n+7){display:none}}
 </style>
 </head>
 {%- set q = "?site=" ~ site if site else "" -%}

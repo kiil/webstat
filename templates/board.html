@@ -21,6 +21,37 @@
       {% else %}<tr><td class="empty" colspan="7">Ingen artikler endnu</td></tr>{% endfor %}
     </table>
 
+    {%- set kinds = {"v": ["▶", "Video"], "e": ["◧", "Indlejring"], "i": ["▣", "Billede"], "q": ["❝", "Citat"], "t": ["▦", "Tabel"], "h": ["H", "Mellemrubrik"], "a": ["♪", "Lyd"]} %}
+    {% if today.attention %}
+    <h2>Hvor læserne hviler og stopper</h2>
+    <p class="note">Artiklen fra top til bund. Rød: hvor læserne holder pause og læser. Grå søjler: hvor de, der ikke læste færdig, stoppede. Mærkerne er artiklens video, billeder, tabeller, citater og mellemrubrikker.</p>
+    {% for a in today.attention %}
+    <div class="att">
+      <div class="att-head"><span class="p">{{ link(a) }}</span><small>{{ a.n }} målt · {{ a.finished }} % læste færdig</small></div>
+      <div class="att-marks">{% for k in a.marks %}<i class="mk{% if a.brake and k.pos == a.brake.pos %} brake{% endif %}" style="left:{{ k.pos }}%" title="{{ kinds[k.kind][1] }}{% if k.label %}: {{ k.label }}{% endif %} · ved {{ k.pos }} % · nået af {{ k.reached_pct }} %{% if k.dwell %} · {{ k.dwell }} s i synsfeltet (median){% endif %}{% if k.engaged %} · {{ k.engaged }} klikkede ind{% endif %}{% if k.stop_pct is not none %} · {{ k.stop_pct }} % stoppede her{% endif %}">{{ kinds[k.kind][0] }}</i>{% endfor %}</div>
+      <div class="att-heat">{% for h in a.heat %}<i class="h{{ h }}"></i>{% endfor %}</div>
+      <div class="att-exit">{% for e in a.exits %}<i style="height:{{ e }}%"></i>{% endfor %}</div>
+      {% if a.brake %}<p class="brake-note">{{ kinds[a.brake.kind][0] }} <b>{{ kinds[a.brake.kind][1] }}{% if a.brake.label %} ({{ a.brake.label }}){% endif %}</b> ved {{ a.brake.pos }} % bremser: {{ a.brake.stop_pct }} % af de {{ a.brake.reached }}, der nåede den, stoppede der{% if a.brake.engaged %}, og {{ a.brake.engaged }} klikkede ind{% endif %}.</p>{% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if today.teasers %}
+    {%- set mods = {"k": "Kort nyt", "a": "Fra arkivet", "u": "Ugens eftertragtede", "h": "Hot lige nu"} %}
+    <h2>Fra forsiden til læsning</h2>
+    <p class="note">Set: teaseren var halvt fremme i et sekund. Klik og CTR fra forsiden. ½, Færdig og Tid gælder dem, der kom ind fra forsiden. Gode klik: læst halvvejs eller et minut med artiklen.</p>
+    <table class="cols">
+      <tr><th>Teaser</th><th title="Hvor på forsiden">Plads</th><th title="Set i mindst et sekund">Set</th><th>Klik</th><th>CTR</th><th title="Andel der nåede halvvejs">½</th><th title="Andel der læste færdig">Færdig</th><th title="Median tid med artiklen fremme">Tid</th><th title="Klik der blev til læsning">Gode</th></tr>
+      {% for t in today.teasers %}<tr><td class="p">{{ link(t) }}</td><td class="n">{% if t.at %}{% if t.at[0] == "f" %}Billede {{ t.at[1:] }}{% else %}{{ mods[t.at[0]] }}{% endif %}{% endif %}</td><td class="n">{{ t.seen }}</td><td class="n">{{ t.clicks or "" }}</td><td class="n">{% if t.ctr is not none %}{{ t.ctr }} %{% endif %}</td><td class="n">{% if t.read50 is not none %}{{ t.read50 }} %{% endif %}</td><td class="n">{% if t.read100 is not none %}{{ t.read100 }} %{% endif %}</td><td class="n">{{ t.median | default("", true) }}{% if t.median %} s{% endif %}</td><td class="n">{{ t.good or "" }}</td></tr>{% endfor %}
+    </table>
+    {% if today.modules %}
+    <table class="cols mods">
+      <tr><th>Plads på forsiden</th><th>Set</th><th>Klik</th><th>CTR</th></tr>
+      {% for m in today.modules %}<tr><td>{% if m.mod[0] == "f" %}Forsidebillede {{ m.mod[1:] }}{% else %}{{ mods[m.mod] }}{% endif %}</td><td class="n">{{ m.seen }}</td><td class="n">{{ m.clicks }}</td><td class="n">{% if m.ctr is not none %}{{ m.ctr }} %{% endif %}</td></tr>{% endfor %}
+    </table>
+    {% endif %}
+    {% endif %}
+
     <h2>Mest læst i dag</h2>
     <table>{% for r in today.paths %}<tr><td class="p">{{ link(r) }}</td><td class="n">{{ r.views }}</td></tr>{% endfor %}</table>
   </section>

@@ -6,10 +6,12 @@
 // reader's device; the view id lives only as long as the page.
 //
 // Reports: the page view; reading 50 and 100 percent of an article; the
-// seconds the page was visible (when it is hidden or left); clicks on
-// support and subscription links. On the front page it also puts webstat's
-// hot list above "Ugens eftertragtede" (when at least two articles are
-// hot).
+// seconds the page was visible (when it is hidden or left), with where in
+// the article the reader rested and stopped and which landmarks (video,
+// embeds, images, quotes, subheadings) held them; clicks on support and
+// subscription links; on the front page, the teasers seen and clicked. On
+// the front page it also puts webstat's hot list above "Ugens eftertragtede"
+// (when at least two articles are hot).
 (function () {
   if (!navigator.sendBeacon || navigator.webdriver || document.visibilityState === 'prerender') { return; }
   var collector = '/nyt.php';
@@ -91,7 +93,189 @@
       if (target) { send('click', {target: target}); }
     }, true);
 
+    if (body) { watchAttention(body); }
+    if (path === '/') { watchTeasers(); }
     showHot();
+  }
+
+  // Where the reader rests and stops in the article. Once a second, while
+  // the page is visible and the reader has done something in the last 30
+  // seconds (or is inside an embed, e.g. watching a video), the scroll
+  // position counts as rest when it has not moved for 1.2 seconds. The
+  // reading line is 40 percent down the window; the band of the body under
+  // it gets the second. Landmarks (video, other embeds, images, quotes,
+  // tables, subheadings) get the second when they are in the middle of the
+  // window. Sent with each leave report.
+  var attention = null;
+
+  function watchAttention(body) {
+    var a = {body: body, rest: [], depth: 0, at: null, marks: [], lastMove: Date.now(), lastActive: Date.now()};
+    for (var i = 0; i < 20; i++) { a.rest.push(0); }
+    attention = a;
+
+    function kindOf(el) {
+      var tag = el.tagName;
+      if (tag === 'IFRAME') {
+        var host = hostOf(el.src);
+        return /youtube|youtu\.be|vimeo|dailymotion|dr\.dk|tv2\.dk|twitch|ted\.com/.test(host) || /plugins\/video/.test(el.src) ? 'v' : 'e';
+      }
+      return {VIDEO: 'v', AUDIO: 'a', FIGURE: 'i', IMG: 'i', PICTURE: 'i', TABLE: 't', BLOCKQUOTE: 'q', H2: 'h', H3: 'h', H4: 'h'}[tag] || null;
+    }
+    function labelOf(el, kind) {
+      var text = '';
+      if (kind === 'v' || kind === 'e') { text = el.tagName === 'IFRAME' ? hostOf(el.src) || el.title || '' : (el.title || ''); }
+      else if (kind === 'i') { var cap = el.querySelector && el.querySelector('figcaption'); var img = el.tagName === 'IMG' ? el : el.querySelector && el.querySelector('img'); text = (cap && cap.textContent) || (img && img.alt) || ''; }
+      else { text = el.textContent || ''; }
+      return text.replace(/\s+/g, ' ').trim().slice(0, 40);
+    }
+    // Landmarks in order down the body, the outermost element of each; run
+    // again after load, when embeds have replaced their placeholders.
+    function collect() {
+      var known = a.marks.map(function (m) { return m.el; });
+      body.querySelectorAll('iframe, video, audio, figure, picture, img, table, blockquote, h2, h3, h4').forEach(function (el) {
+        if (a.marks.length >= 12 || known.indexOf(el) >= 0) { return; }
+        for (var j = 0; j < known.length; j++) { if (known[j].contains(el) || el.contains(known[j])) { return; } }
+        var kind = kindOf(el);
+        if (!kind) { return; }
+        if (kind === 'i' && el.getBoundingClientRect().height > 0 && el.getBoundingClientRect().height < 80) { return; }
+        if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') {
+          el.addEventListener('play', function () { mark.engaged = 1; });
+        }
+        var mark = {el: el, kind: kind, label: labelOf(el, kind), dwell: 0, engaged: 0};
+        a.marks.push(mark);
+        known.push(el);
+      });
+      a.marks.sort(function (x, y) { return x.el.compareDocumentPosition(y.el) & 2 ? 1 : -1; });
+    }
+    collect();
+    window.addEventListener('load', collect);
+
+    var moved = function () { a.lastMove = Date.now(); a.lastActive = a.lastMove; };
+    var active = function () { a.lastActive = Date.now(); };
+    window.addEventListener('scroll', moved, {passive: true});
+    ['mousemove', 'keydown', 'touchstart', 'wheel'].forEach(function (e) { window.addEventListener(e, active, {passive: true}); });
+    // A click into an embed moves focus into its iframe and blurs the page.
+    window.addEventListener('blur', function () {
+      setTimeout(function () {
+        var el = document.activeElement;
+        a.marks.forEach(function (m) { if (m.el === el || (m.el.contains && m.el.contains(el))) { m.engaged = 1; } });
+      }, 0);
+    });
+
+    setInterval(function () {
+      if (document.visibilityState !== 'visible') { return; }
+      var inEmbed = document.activeElement && document.activeElement.tagName === 'IFRAME';
+      var now = Date.now();
+      if (!inEmbed && now - a.lastActive > 30000) { return; }
+      var box = body.getBoundingClientRect();
+      if (box.height <= 0) { return; }
+      var vh = window.innerHeight;
+      var seen = Math.round(Math.min(Math.max((vh - box.top) / box.height, 0), 1) * 100);
+      if (seen > a.depth) { a.depth = seen; }
+      if (!inEmbed && now - a.lastMove < 1200) { return; }
+      var p = (vh * 0.4 - box.top) / box.height;
+      if (p < 0 || p > 1) { return; }
+      a.rest[Math.min(19, Math.floor(p * 20))] += 1;
+      a.at = Math.round(p * 100);
+      a.marks.forEach(function (m) {
+        var r = m.el.getBoundingClientRect();
+        if (r.height > 0 && r.bottom > vh * 0.15 && r.top < vh * 0.85) { m.dwell += 1; }
+      });
+    }, 1000);
+  }
+
+  function attentionReport() {
+    var a = attention;
+    if (!a) { return {}; }
+    var box = a.body.getBoundingClientRect();
+    var marks = [];
+    a.marks.forEach(function (m) {
+      var r = m.el.getBoundingClientRect();
+      if (box.height <= 0 || (r.height === 0 && r.width === 0)) { return; }
+      var pos = Math.round(Math.min(Math.max((r.top - box.top) / box.height, 0), 1) * 100);
+      marks.push([m.kind, pos, m.label, Math.min(m.dwell, 7200), m.engaged]);
+    });
+    var out = {depth: a.depth, rest: a.rest.map(function (x) { return Math.min(x, 7200); })};
+    if (a.at !== null) { out.at = a.at; }
+    if (marks.length) { out.marks = marks; }
+    return out;
+  }
+
+  // Front page teasers: one counts as seen when half of it has been in the
+  // window for a second, once per page view. Sent when the page is hidden;
+  // a click on one is sent at once. The module is one letter (f the
+  // showcase, k Kort nyt, a the archive bands, u Ugens eftertragtede, h Hot
+  // lige nu), the place counts from 1 within it, and the headline goes with
+  // it.
+  var teaserUnits = [
+    ['.fs-item', 'f'], ['.kn-item', 'k'], ['.band-item', 'a'],
+    ['#block-bootstrap-barrio-views-block-ga-block-1 li', 'u'], ['.folkets-hot li', 'h']
+  ];
+  var teaserSeen = {};
+  var teaserPending = [];
+  var teaserObserver = null;
+  var teaserTimers = typeof WeakMap === 'function' ? new WeakMap() : null;
+
+  function teaserOf(el) {
+    for (var i = 0; i < teaserUnits.length; i++) {
+      var unit = el.closest && el.closest(teaserUnits[i][0]);
+      if (!unit) { continue; }
+      var all = Array.prototype.slice.call(document.querySelectorAll(teaserUnits[i][0]));
+      var a = unit.querySelector('a[href]');
+      if (!a) { return null; }
+      var target;
+      try { var u = new URL(a.href); if (u.hostname !== location.hostname) { return null; } target = decodeURIComponent(u.pathname); } catch (e) { return null; }
+      if (target === '/') { return null; }
+      var head = unit.querySelector('h2, h3, h4, h5, .fs-title, .kn-title, .band-title') || a;
+      return [target, teaserUnits[i][1], all.indexOf(unit) + 1, (head.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120)];
+    }
+    return null;
+  }
+
+  function watchTeasers() {
+    if (!('IntersectionObserver' in window) || !teaserTimers) { return; }
+    if (!teaserObserver) {
+      teaserObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          var el = e.target;
+          if (e.intersectionRatio >= 0.5) {
+            if (teaserTimers.get(el)) { return; }
+            teaserTimers.set(el, setTimeout(function () {
+              var t = teaserOf(el);
+              if (t && !teaserSeen[t[0]]) { teaserSeen[t[0]] = true; teaserPending.push(t); }
+              teaserObserver.unobserve(el);
+            }, 1000));
+          } else if (teaserTimers.get(el)) {
+            clearTimeout(teaserTimers.get(el));
+            teaserTimers.delete(el);
+          }
+        });
+      }, {threshold: [0, 0.5]});
+      document.addEventListener('click', function (e) {
+        var a = e.target.closest && e.target.closest('a[href]');
+        var t = a && teaserOf(a);
+        if (t) { send('tclick', {target: t[0], mod: t[1], pos: t[2]}); }
+      }, true);
+    }
+    teaserUnits.forEach(function (u) {
+      document.querySelectorAll(u[0]).forEach(function (el) { teaserObserver.observe(el); });
+    });
+  }
+
+  // Seen teasers in reports under nyt.php's 4096 bytes.
+  function bytes(x) { return unescape(encodeURIComponent(JSON.stringify(x))).length; }
+  function flushTeasers() {
+    while (teaserPending.length) {
+      var chunk = [];
+      var size = 80;
+      while (teaserPending.length && size + bytes(teaserPending[0]) < 3500) {
+        var t = teaserPending.shift();
+        size += bytes(t) + 1;
+        chunk.push(t);
+      }
+      if (!chunk.length) { teaserPending.shift(); continue; }
+      send('teasers', {seen: chunk});
+    }
   }
 
   // Seconds the page was visible, sent each time it is hidden (the latest
@@ -102,7 +286,12 @@
     if (document.visibilityState === 'hidden') {
       if (visibleSince) { visible += Date.now() - visibleSince; visibleSince = null; }
       var seconds = Math.round(visible / 1000);
-      if (seconds >= 1) { send('leave', {seconds: Math.min(seconds, 7200)}); }
+      if (seconds >= 1) {
+        var report = attentionReport();
+        report.seconds = Math.min(seconds, 7200);
+        send('leave', report);
+      }
+      flushTeasers();
     } else {
       visibleSince = Date.now();
     }
@@ -135,6 +324,7 @@
       block.appendChild(h);
       block.appendChild(list);
       anchor.parentNode.insertBefore(block, anchor);
+      watchTeasers();
     }).catch(function () {});
   }
 
