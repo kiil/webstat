@@ -12,6 +12,8 @@
   #   spike    a path whose hot score reaches this is "taking off" (one
   #            alert a day per path)
   #   clicks   what the beacon's click events count on this site
+  #   prints   (optional) the name for clicks on /print/ links, counted
+  #            apart from the other clicks
   sites: {
     folkets: {
       origins: ["https://www.folkets.dk" "https://folkets.dk"]
@@ -26,6 +28,7 @@
       name: "Klimaleksikon"
       spike: 4
       clicks: "Downloads"
+      prints: "Udskriv som PDF"
     }
     climate: {
       origins: ["https://www.climate-encyclopedia.com" "https://climate-encyclopedia.com"]
@@ -33,6 +36,7 @@
       name: "Climate Encyclopedia"
       spike: 4
       clicks: "Downloads"
+      prints: "Udskriv som PDF"
     }
     docujai: {
       origins: ["https://docujai.com" "https://www.docujai.com"]

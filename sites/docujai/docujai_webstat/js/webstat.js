@@ -5,6 +5,9 @@
 // preflight, and they survive the reader moving on. Nothing is stored on the
 // reader's device; the view id lives only as long as the page.
 //
+// The module writes this file inline into the page (as folkets.dk does), so
+// ad blockers that stop scripts by their address have nothing to match.
+//
 // Reports: the page view; reading 50 and 100 percent of the body; the
 // seconds the page was visible (when it is hidden or left); contact clicks
 // (/contact, /kontakt, mail and phone links).

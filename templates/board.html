@@ -7,6 +7,7 @@
   <div class="tile"><b>{{ today.views }}</b><span>Visninger i dag</span></div>
   <div class="tile"><b>{% if today.visitors %}{{ today.visitors }}{% else %}–{% endif %}</b><span>Besøgende i dag</span></div>
   <div class="tile"><b>{{ today.clicks }}</b><span>{{ site.clicks }} i dag</span></div>
+  {% if site.prints %}<div class="tile"><b>{{ today.prints or 0 }}</b><span>{{ site.prints }} i dag</span></div>{% endif %}
 </div>
 <div class="grid">
   <section>
@@ -15,9 +16,9 @@
 
     <h2>Artikler i dag</h2>
     <table class="cols">
-      <tr><th>Artikel</th><th title="Visninger">Vis.</th><th title="Andel der nåede halvvejs">½</th><th title="Andel der læste færdig">Færdig</th><th title="Median tid med siden fremme">Tid</th><th title="{{ site.clicks }} fra siden">Klik</th></tr>
-      {% for a in articles %}<tr><td class="p">{{ link(a) }}</td><td class="n">{{ a.views }}</td><td class="n">{{ a.read50 }} %</td><td class="n">{{ a.read100 }} %</td><td class="n">{{ a.time or "–" }}</td><td class="n">{{ a.clicks or "" }}</td></tr>
-      {% else %}<tr><td class="empty" colspan="6">Ingen artikler endnu</td></tr>{% endfor %}
+      <tr><th>Artikel</th><th title="Visninger">Vis.</th><th title="Andel der nåede halvvejs">½</th><th title="Andel der læste færdig">Færdig</th><th title="Median tid med siden fremme">Tid</th><th title="{{ site.clicks }} fra siden">Klik</th>{% if site.prints %}<th title="{{ site.prints }}">PDF</th>{% endif %}</tr>
+      {% for a in articles %}<tr><td class="p">{{ link(a) }}</td><td class="n">{{ a.views }}</td><td class="n">{{ a.read50 }} %</td><td class="n">{{ a.read100 }} %</td><td class="n">{{ a.time or "–" }}</td><td class="n">{{ a.clicks or "" }}</td>{% if site.prints %}<td class="n">{{ a.prints or "" }}</td>{% endif %}</tr>
+      {% else %}<tr><td class="empty" colspan="7">Ingen artikler endnu</td></tr>{% endfor %}
     </table>
 
     <h2>Mest læst i dag</h2>
@@ -34,6 +35,8 @@
     <table>
       {% for r in today.click_targets %}<tr><td class="p">{{ r.name }}</td><td class="n">{{ r.views }}</td></tr>{% else %}<tr><td class="empty">Ingen klik endnu</td></tr>{% endfor %}
     </table>
+    {% if site.prints %}<h2>{{ site.prints }}</h2>
+    <table>{% for r in today.prints_from %}<tr><td class="p">{{ link(r) }}</td><td class="n">{{ r.views }}</td></tr>{% else %}<tr><td class="empty">Ingen endnu</td></tr>{% endfor %}</table>{% endif %}
     {% if today.subscribe_from %}<h2>Til /abonnent fra</h2>
     <table>{% for r in today.subscribe_from %}<tr><td class="p">{{ link(r) }}</td><td class="n">{{ r.views }}</td></tr>{% endfor %}</table>{% endif %}
 
@@ -50,8 +53,8 @@
 {% if history %}
 <h2>Tidligere dage</h2>
 <table class="cols">
-  <tr><th>Dag</th><th>Mest læst</th><th>Besøg.</th><th>Vis.</th><th>Klik</th></tr>
-  {% for d in history %}<tr><td class="t">{{ d.day }}</td><td class="p">{% if d.top %}{{ link(d.top[0]) }}{% endif %}</td><td class="n">{% if d.visitors %}{{ d.visitors }}{% else %}–{% endif %}</td><td class="n">{{ d.views }}</td><td class="n">{{ d.clicks or "" }}</td></tr>{% endfor %}
+  <tr><th>Dag</th><th>Mest læst</th><th>Besøg.</th><th>Vis.</th><th>Klik</th>{% if site.prints %}<th title="{{ site.prints }}">PDF</th>{% endif %}</tr>
+  {% for d in history %}<tr><td class="t">{{ d.day }}</td><td class="p">{% if d.top %}{{ link(d.top[0]) }}{% endif %}</td><td class="n">{% if d.visitors %}{{ d.visitors }}{% else %}–{% endif %}</td><td class="n">{{ d.views }}</td><td class="n">{{ d.clicks or "" }}</td>{% if site.prints %}<td class="n">{{ d.prints or "" }}</td>{% endif %}</tr>{% endfor %}
 </table>
 {% endif %}
 {% else %}

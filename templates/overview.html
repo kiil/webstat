@@ -20,6 +20,7 @@
         <span><b>{{ c.views }}</b> i dag</span>
         <span><b>{% if c.visitors %}{{ c.visitors }}{% else %}–{% endif %}</b> besøgende</span>
         <span><b>{{ c.clicks }}</b> {{ c.clicks_label | lower }}</span>
+        {% if c.prints_label %}<span><b>{{ c.prints }}</b> {{ c.prints_label | lower }}</span>{% endif %}
       </div>
       {% if c.days | length > 1 %}<div class="spark" role="img" aria-label="Visninger pr. dag, de seneste {{ c.days | length }} dage">{% for d in c.days %}<i style="height:{{ d.pct }}%" title="{{ d.day }}: {{ d.views }}"></i>{% endfor %}</div>{% endif %}
       <h3>Mest læst i dag</h3>

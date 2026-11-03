@@ -7,7 +7,13 @@
  * are counted. The beacon posts to /nyt.php, the collector deployed from
  * ../nyt.php; webstat itself lives in /Users/lk/cross.stream/webstat, and so
  * does this module's source (sites/docujai/).
+ *
+ * The script is written inline into the page, as on folkets.dk, not linked
+ * as a file: ad blockers' lists (EasyPrivacy has "/webstat.js") stop a
+ * script by its address, and an inline script has none.
  */
+
+use Drupal\Core\Render\Markup;
 
 /**
  * Implements hook_page_attachments().
@@ -18,5 +24,17 @@ function docujai_webstat_page_attachments(array &$attachments) {
   if (\Drupal::currentUser()->isAuthenticated() || \Drupal::service('router.admin_context')->isAdminRoute()) {
     return;
   }
-  $attachments['#attached']['library'][] = 'docujai_webstat/beacon';
+  $js = file_get_contents(__DIR__ . '/js/webstat.js');
+  if ($js === FALSE) {
+    return;
+  }
+  // The beacon reads drupalSettings for the node id.
+  $attachments['#attached']['library'][] = 'core/drupalSettings';
+  $attachments['#attached']['html_head'][] = [
+    [
+      '#tag' => 'script',
+      '#value' => Markup::create($js),
+    ],
+    'docujai_webstat',
+  ];
 }

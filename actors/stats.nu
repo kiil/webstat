@@ -5,12 +5,14 @@
 # every event, so the dashboard reads one frame. The day comes from the frame's meta (set by the server in
 # Copenhagen time), so a replay from the first frame gives the same result.
 # When an event from a new day arrives, today moves into the history (the
-# last 400 days are kept, each with its views, visitors, top five articles
-# and support clicks).
+# last 400 days are kept, each with its views, visitors, top five articles,
+# clicks and prints).
 #
 # Events: pageview (counts, titles, referrers, feed), read (50/100 percent of
 # an article), leave (seconds visible, the latest per page view), click (a
-# support or subscription link). It also keeps the last hour of page views
+# support or subscription link, or a download). A click whose target is under
+# /print/ ("Udskriv som PDF" on klimaleksikon.dk) is a print, counted apart
+# from the other clicks by the page it was printed from. It also keeps the last hour of page views
 # as {path, ts, ref} (`recent`), from which the server scores what is hot;
 # views without `ts` (before the server stamped them) are left out.
 {
@@ -28,7 +30,7 @@
     # One site's step: its state and the event in, {out?, next} back. It is
     # defined here because the actor's engine sees nothing outside `run`.
     let fold = {|frame, kind, m, day, state|
-      let blank = {day: $day, views: 0, visitors: {}, paths: {}, titles: {}, refs: {}, devices: {}, browsers: {}, systems: {}, types: {}, read50: {}, read100: {}, leaves: {}, clicks: {}, clicks_from: {}, subscribe_from: {}}
+      let blank = {day: $day, views: 0, visitors: {}, paths: {}, titles: {}, refs: {}, devices: {}, browsers: {}, systems: {}, types: {}, read50: {}, read100: {}, leaves: {}, clicks: {}, clicks_from: {}, prints: {}, subscribe_from: {}}
       # Fill keys a state from an older version of this actor lacks.
       let current = ($blank | merge ($state | get -o today | default {}))
       let history = ($state | get -o history | default {})
@@ -49,6 +51,7 @@
           visitors: ($current.visitors | columns | length)
           top: (do $top $current.paths 5 | each {|r| $r | insert title ($current.titles | get -o $r.name) })
           clicks: ($current.clicks | values | reduce -f 0 {|x, acc| $acc + $x })
+          prints: ($current.prints | values | reduce -f 0 {|x, acc| $acc + $x })
         }
         {today: $blank, history: ($history | upsert $current.day $closed
           | transpose k v | sort-by k | last 400 | reduce -f {} {|r, acc| $acc | insert $r.k $r.v })}
@@ -85,9 +88,13 @@
         "leave" => (if ($m | get -o view) == null { $t } else {
           $t | upsert leaves ($t.leaves | upsert $m.view {path: $path, seconds: $m.seconds})
         })
-        "click" => ($t
+        "click" => (if ($m | get -o target | default "" | str starts-with "/print/") {
+          $t | upsert prints (do $bump $t.prints $path)
+        } else {
+          $t
           | upsert clicks (do $bump $t.clicks ($m | get -o target))
-          | upsert clicks_from (do $bump $t.clicks_from $path))
+          | upsert clicks_from (do $bump $t.clicks_from $path)
+        })
       })
 
       # Per article (a path with a headline, not the front page): views, the
@@ -109,6 +116,7 @@
             read100: ([($r100 * 100 // $r.views) 100] | math min)
             median: (if ($secs | is-empty) { null } else { $secs | math median | into int })
             clicks: ($today.clicks_from | get -o $r.name | default 0)
+            prints: ($today.prints | get -o $r.name | default 0)
           }
         })
 
@@ -130,12 +138,14 @@
           types: (do $top $today.types 6)
           click_targets: (do $top $today.clicks 6)
           clicks_from: (do $titled (do $top $today.clicks_from 6))
+          prints: ($today.prints | values | reduce -f 0 {|x, acc| $acc + $x })
+          prints_from: (do $titled (do $top $today.prints 6))
           subscribe_from: (do $titled (do $top $today.subscribe_from 6))
         }
         recent: $recent
         feed: $feed
         history: ($rolled.history | transpose day figures | sort-by day --reverse | first 30
-          | each {|r| {visitors: 0, top: [], clicks: 0} | merge $r.figures | insert day $r.day })
+          | each {|r| {visitors: 0, top: [], clicks: 0, prints: 0} | merge $r.figures | insert day $r.day })
       }
       {out: $out, next: {today: $today, history: $rolled.history, recent: $recent, feed: $feed}}
     }

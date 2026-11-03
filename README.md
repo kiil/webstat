@@ -82,7 +82,11 @@ Caddy buffers responses, turn that off for `/updates` or nothing arrives.
 On klimaleksikon.dk the module `klimaleksikon_webstat` attaches the beacon
 to every page anonymous readers see, and `/nyt.php` forwards as on
 folkets.dk with the same key (both sites run on one hosting account). Its
-clicks are downloads: "Udskriv som PDF" and the teaching sets' PDFs.
+clicks are downloads, the teaching sets' PDFs; "Udskriv som PDF"
+(`/print/pdf/node/N`) is counted apart as prints (`prints` in
+`config.nuon`). The module writes the beacon inline into the page, as on
+folkets.dk: EasyPrivacy, on in uBlock Origin, blocks any script named
+`webstat.js`, so a linked file is never loaded behind an ad blocker.
 
 On docujai.com the module `docujai_webstat` (`sites/docujai/`, deployed to
 `public_html/modules/custom/`) does the same, and `public_html/nyt.php`
@@ -146,7 +150,7 @@ All under `webstat.<site>.`, empty body, the facts in meta; every event has
 | `pageview` | `title` (the page's h1), `nid`, `type` (`node--type-*`), `ref` (another site's host), `from` (the path on folkets.dk the reader came from), `device` (`mobile` < 768 px, `tablet` < 1200 px, `desktop`), `lang`, `browser`, `system` (coarse, from the user agent), `visitor` |
 | `read` | `depth`: 50 when half the article body has been on screen, 100 at 95 percent |
 | `leave` | `seconds` the page was visible, sent each time it is hidden; the latest per view counts |
-| `click` | `target`: on folkets.dk the path and query of an `/abonnent` or `/stot` link, or `stripe`; on klimaleksikon.dk the path of a PDF |
+| `click` | `target`: on folkets.dk the path and query of an `/abonnent` or `/stot` link, or `stripe`; on klimaleksikon.dk the path of a PDF or `/print/pdf/node/N`, counted as a print |
 
 `visitor` is the first 16 hex of sha256(salt, IP, user agent), only when
 the IP is a public address. The server accepts events only from the origins

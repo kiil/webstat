@@ -61,7 +61,8 @@ def check-site [cfg: record, site: string, conf: record, s: record, first: strin
     let y = ($yesterday | first)
     let lines = ($y | get -o top | default [] | enumerate | each {|r| $"($r.index + 1). ($r.item.title? | default $r.item.name) \(($r.item.views)\)" } | str join "\n")
     let visitors = (if $y.visitors > 0 { $", ($y.visitors) besøgende" } else { "" })
-    notify $cfg $"($conf.name) i går: ($y.views) visninger" $"($y.day): ($y.views) visninger($visitors), ($y.clicks) ($conf.clicks | str downcase).\n\n($lines)" $"https://webstat.kiil.cross.stream/?site=($site)"
+    let prints = (if ($conf | get -o prints) == null { "" } else { $", ($y | get -o prints | default 0) ($conf.prints | str downcase)" })
+    notify $cfg $"($conf.name) i går: ($y.views) visninger" $"($y.day): ($y.views) visninger($visitors), ($y.clicks) ($conf.clicks | str downcase)($prints).\n\n($lines)" $"https://webstat.kiil.cross.stream/?site=($site)"
     "" | .append webstat.report --meta {day: $day, site: $site, about: $y.day} | ignore
   }
 }

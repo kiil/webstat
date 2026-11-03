@@ -77,7 +77,7 @@ try {
 
 def settings []: nothing -> record { open $CONFIG }
 
-# The sites in config.nuon: name -> {origins, base, name, spike, clicks}.
+# The sites in config.nuon: name -> {origins, base, name, spike, clicks, prints?}.
 def sites []: nothing -> record { settings | get sites }
 
 # The site an origin belongs to, or null.
@@ -239,10 +239,12 @@ def overview-data []: nothing -> record {
       name: $r.conf.name
       base: $r.conf.base
       clicks_label: $r.conf.clicks
+      prints_label: ($r.conf | get -o prints)
       now: (recent-count $recent $now 300)
       views: ($t | get -o views | default 0)
       visitors: ($t | get -o visitors | default 0)
       clicks: ($t | get -o clicks | default 0)
+      prints: ($t | get -o prints | default 0)
       hot: (hot $recent ($t | get -o titles | default {}) $now 10)
       paths: ($t | get -o paths | default [] | first 3)
       days: ($days | each {|d| {day: $d.day, views: $d.views, pct: ([($d.views * 100 // $top) 2] | math max)} })
