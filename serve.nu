@@ -349,6 +349,20 @@ def board [site: any]: nothing -> string {
 
     (route {method: "GET", path: "/health"} {|req ctx| "ok" })
 
+    # The actor's and service's lifecycle frames (active, inactive with the
+    # error, replaced ...) and how far the actor has got, to see why the
+    # figures stop moving while /hit still answers.
+    (route {method: "GET", path: "/api/actor"} {|req ctx|
+      let lifecycle = {|pattern| .cat -T $pattern | last 15 | each {|f| {topic: $f.topic, id: $f.id, meta: ($f.meta? | default {})} } }
+      let last_event = (try { .cat -T "webstat.*" | last 1 | get -o 0 } catch { null })
+      {
+        actor: (do $lifecycle "xs.actor.webstat-stats.*")
+        service: (do $lifecycle "xs.service.webstat-alerts.*")
+        last_out: (try { (.last webstat-stats.out).meta.updated? } catch { null })
+        last_event: (if $last_event == null { null } else { {topic: $last_event.topic, id: $last_event.id} })
+      } | to json | metadata set --content-type "application/json"
+    })
+
     # What the platform tells us about the caller (only ever the caller's own
     # address), to see which header carries the reader's IP behind the proxy.
     (route {method: "GET", path: "/whoami"} {|req ctx|
