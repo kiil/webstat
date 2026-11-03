@@ -2,7 +2,8 @@
 #
 # The actor keeps today's tallies per site in its state and writes a summary
 # of every site to `webstat-stats.out` (ttl last:1, `sites.<site>`) after
-# every event, so the dashboard reads one frame. The day comes from the frame's meta (set by the server in
+# every new event, and once when a replay is done, so the dashboard reads one
+# frame. The day comes from the frame's meta (set by the server in
 # Copenhagen time), so a replay from the first frame gives the same result.
 # When an event from a new day arrives, today moves into the history (the
 # last 400 days are kept, each with its views, visitors, top five articles,
@@ -17,6 +18,14 @@
 # views without `ts` (before the server stamped them) are left out.
 {
   run: {|frame, state = {}|
+    # The latest summary of every site, as kept in the state.
+    let summaries = {|sites| $sites | transpose name s | where {|r| $r.s.out != null } | reduce -f {} {|r, acc| $acc | insert $r.name $r.s.out } }
+    # The replay is done: write the summary once, now that it is complete.
+    if $frame.topic == "xs.threshold" {
+      let sites = ($state | get -o sites | default {})
+      if ($sites | is-empty) { return {next: $state} }
+      return {out: {updated: $frame.id, sites: (do $summaries $sites)}, next: $state}
+    }
     let p = ($frame.topic | split row ".")
     let kind = ($p | last)
     if ($p | length) != 3 or ($p | first) != "webstat" or $kind not-in [pageview read leave click] {
@@ -156,8 +165,14 @@
     let before = ($sites | get -o $site | default {state: {}, out: null})
     let step = (do $fold $frame $kind $m $day $before.state)
     let sites = ($sites | upsert $site {state: $step.next, out: ($step | get -o out | default $before.out)})
-    let summaries = ($sites | transpose name s | where {|r| $r.s.out != null } | reduce -f {} {|r, acc| $acc | insert $r.name $r.s.out })
-    {out: {updated: $frame.id, sites: $summaries}, next: {sites: $sites}}
+    # While the actor replays old frames it writes nothing: one output per
+    # replayed frame is thousands of frames at once, which overruns xs's live
+    # subscription so the actor never sees a new frame again (seen
+    # 2026-11-03). The threshold frame above writes the replay's result.
+    let ts = ($m | get -o ts)
+    let fresh = ($ts | describe) == "int" and ((date now | into int) // 1_000_000_000) - $ts < 120
+    if not $fresh { return {next: {sites: $sites}} }
+    {out: {updated: $frame.id, sites: (do $summaries $sites)}, next: {sites: $sites}}
   }
 
   start: "first"
