@@ -34,6 +34,144 @@ Add it to `sites` in `config.nuon` (the origins must match the pages'
 `Origin` exactly) and push; a beacon from an origin not listed gets 403.
 Then give the site a collector like `nyt.php` that knows the key.
 
+## Setting it up on your own sites
+
+webstat is one http-nu handler over an xs store; nothing in it is tied to
+Drupal. To run your own: deploy this repo (on cross.stream, or locally as in
+[Run](#run)), list your sites in `config.nuon`, and set the key with
+`POST /admin/settings` (see [Secrets](#secrets)). Then each site needs two
+things: a **beacon** in its pages and, where the platform allows it, a
+**collector**.
+
+There are two ways for a beacon to reach webstat:
+
+| | First-party collector (`/nyt.php`) | Straight to `/hit` |
+| --- | --- | --- |
+| Needs | server code on the site's own domain (PHP, a Worker, an edge function) | only a `<script>` in the page |
+| Visitors counted | yes: the collector sends the reader's IP with the key | no: webstat only sees its own proxy's address |
+| Ad blockers | leave it alone (same domain) | may block requests to another host |
+| Fits | WordPress, Drupal, any PHP host; static sites behind Cloudflare/Netlify/Vercel | Shopify, Squarespace, Wix, plain GitHub Pages |
+
+The collector is `sites/docujai/nyt.php`: a plain PHP file, no framework.
+Copy it to the site's web root and change three things: `WEBSTAT` (your
+webstat's address), `ORIGINS` (the site's origins, as in `config.nuon`) and
+where it reads the key (keep the key file outside the web root). It answers
+the browser with 204 at once and forwards the body to `/hit` with
+`X-Webstat-Key` and `X-Webstat-Ip`, giving up after a second.
+
+The beacon posts small JSON bodies as `text/plain` with `sendBeacon` (no CORS
+preflight, and they survive the reader leaving). The fields webstat accepts
+are in `report` in `serve.nu`; `beacon.js` is the full version (reading depth,
+resting heat, landmarks, teasers), and this is the least that gives views,
+referrers, devices and time on page:
+
+```html
+<script>
+(function () {
+  if (!navigator.sendBeacon || navigator.webdriver) { return; }
+  // '/nyt.php' with a collector, else 'https://<your webstat>/hit'
+  var collector = '/nyt.php';
+  var view = Math.random().toString(36).slice(2, 10);
+  var path = location.pathname;
+  function send(data) {
+    data.view = view; data.path = path;
+    navigator.sendBeacon(collector, new Blob([JSON.stringify(data)], {type: 'text/plain'}));
+  }
+  var here = location.hostname.replace(/^www\./, '');
+  var ref = '';
+  try { ref = new URL(document.referrer).hostname.replace(/^www\./, ''); } catch (e) {}
+  var h1 = document.querySelector('h1');
+  var w = window.innerWidth;
+  send({
+    kind: 'view',
+    title: h1 ? h1.textContent.trim() : null,
+    ref: ref && ref !== here ? ref : null,
+    device: w < 768 ? 'mobile' : w < 1200 ? 'tablet' : 'desktop',
+    lang: document.documentElement.lang || null
+  });
+  // Seconds visible so far, each time the page is hidden; the latest counts.
+  var shown = Date.now(), total = 0;
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') {
+      total += Date.now() - shown;
+      var s = Math.round(total / 1000);
+      if (s >= 1) { send({kind: 'leave', seconds: Math.min(s, 7200)}); }
+    } else { shown = Date.now(); }
+  });
+})();
+</script>
+```
+
+Write the script **inline** in the page, never as a linked file: EasyPrivacy
+(on by default in uBlock Origin) blocks scripts by address, `/webstat.js`
+among them. Leave logged-in editors out so only readers are counted.
+
+### WordPress
+
+Collector: `nyt.php` in the web root, next to `wp-config.php`. Beacon: a
+must-use plugin, which needs no activation and survives theme changes:
+
+```php
+<?php
+// wp-content/mu-plugins/webstat.php (the beacon script beside it as webstat.js)
+add_action('wp_head', function () {
+  if (is_user_logged_in()) { return; }
+  echo '<script>' . file_get_contents(__DIR__ . '/webstat.js') . '</script>';
+});
+```
+
+Page caches (WP Rocket, LiteSpeed Cache, W3TC) serve anonymous pages with
+the script already in them, which is fine: the beacon runs in the browser.
+`ref`/`from` and `title` work as they are; `nid` and `type` stay empty, or
+fill them from `body.className` (`postid-123`, `single-post`).
+
+### Drupal
+
+Exactly what `sites/docujai/` is: a small module, `docujai_webstat`, whose
+`hook_page_attachments()` writes `js/webstat.js` inline into the head for
+anonymous readers outside admin routes, and `nyt.php` in the web root.
+Rename the module, adjust the selectors at the top of `webstat.js` (the
+title, `.field--name-body`, the links counted as clicks), enable it with
+`drush en`. The beacon reads the node id from `drupalSettings`, so
+`nid` and `type` come along.
+
+### Shopify
+
+No server code of your own on the shop's domain, so the beacon goes straight
+to `https://<your webstat>/hit`. Paste it into `layout/theme.liquid` before
+`</head>` (Online Store → Themes → Edit code). Don't use a Customer Events
+custom pixel: it runs in a sandboxed iframe on another origin, which
+webstat rejects. List both `https://<shop>.myshopify.com` and the custom
+domain in `origins`. To count clicks, send `{kind: 'click', target: ...}` from
+the add-to-cart or checkout buttons. With the shop behind your own
+Cloudflare, a Worker can be the collector instead (see below).
+
+### Squarespace
+
+Code Injection → Header (under the site's developer/advanced settings; it
+needs a plan that allows code injection), beacon pointing at
+`https://<your webstat>/hit`. List both the `*.squarespace.com` address and
+the custom domain in `origins`. The editor shows the site in a frame, so
+skip the beacon there (`if (window.top !== window.self) return;`) or your
+own editing counts as views. Wix and Webflow are the same: a custom code
+block in the head.
+
+### Hugo and other static sites
+
+Put the beacon in a partial included in the head (`layouts/partials/head`
+or the theme's hook, e.g. `extend-head.html` in Congo/Blowfish) and inline
+it with `{{ (resources.Get "js/webstat.js" | minify).Content | safeJS }}`
+inside a `<script>`, so no `/js/webstat.js` file is ever requested. Jekyll,
+Eleventy, Astro and Next.js static exports work the same way.
+
+On plain GitHub Pages the beacon has to go straight to `/hit` (that is how
+www.kiils.dk does it). Behind Cloudflare, Netlify or Vercel, a few lines of
+Worker or edge function on the site's own domain can play `nyt.php`: take the
+POST on `/nyt`, answer 204, and forward the body to `/hit` with the key from
+an environment secret and the reader's IP (`CF-Connecting-IP`,
+`x-nf-client-connection-ip`, `x-real-ip`) in `X-Webstat-Ip`. Then visitors
+are counted and ad blockers leave it alone, as on a PHP site.
+
 ## Run
 
 On cross.stream: push to `main`. `cross-stream.nuon` turns on the store, the
