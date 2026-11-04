@@ -13,7 +13,8 @@
 # an article), leave (seconds visible, the latest per page view, with where
 # the reader rested and stopped in the article), click (a support or
 # subscription link, or a download), teasers (front page teasers a reader
-# had in view for a second) and tclick (a click on one of them). A click
+# had in view for a second), tclick (a click on one of them) and search
+# (the words and how many results they gave, counted per word in lower case). A click
 # whose target is under /print/ ("Udskriv som PDF" on klimaleksikon.dk) is a
 # print, counted apart from the other clicks by the page it was printed from.
 # It also keeps the last hour of page views as {path, ts, ref} (`recent`),
@@ -166,11 +167,14 @@
           prints: (do $total $today.prints)
           prints_from: (do $titled (do $top $today.prints 6))
           subscribe_from: (do $titled (do $top $today.subscribe_from 6))
+          searches: ($today.searches | values | sort-by n --reverse | first 25)
+          search_count: ($today.searches | values | reduce -f 0 {|x, acc| $acc + $x.n })
+          search_zero: ($today.searches | values | where hits == 0 | reduce -f 0 {|x, acc| $acc + $x.n })
         }
         recent: $s.recent
         feed: $s.feed
         history: ($s.history | transpose day figures | sort-by day --reverse | first 30
-          | each {|r| {visitors: 0, top: [], clicks: 0, prints: 0} | merge $r.figures | insert day $r.day })
+          | each {|r| {visitors: 0, top: [], clicks: 0, prints: 0, searches: 0} | merge $r.figures | insert day $r.day })
       }
     }
 
@@ -184,7 +188,7 @@
     }
     let p = ($frame.topic | split row ".")
     let kind = ($p | last)
-    if ($p | length) != 3 or ($p | first) != "webstat" or $kind not-in [pageview read leave click teasers tclick] {
+    if ($p | length) != 3 or ($p | first) != "webstat" or $kind not-in [pageview read leave click teasers tclick search] {
       return {next: $state}
     }
     let m = ($frame.meta? | default {})
@@ -195,7 +199,7 @@
     # One site's step: its state and the event in, the next state back. It
     # is defined here because the actor's engine sees nothing outside `run`.
     let fold = {|kind, m, day, state|
-      let blank = {day: $day, views: 0, visitors: {}, paths: {}, titles: {}, refs: {}, devices: {}, browsers: {}, systems: {}, types: {}, read50: {}, read100: {}, leaves: {}, clicks: {}, clicks_from: {}, prints: {}, subscribe_from: {}, teaser_seen: {}, teaser_at: {}, tclicks: {}, mod_seen: {}, mod_clicks: {}, front_views: {}, front_in: {}, front_r50: {}, front_r100: {}}
+      let blank = {day: $day, views: 0, visitors: {}, paths: {}, titles: {}, refs: {}, devices: {}, browsers: {}, systems: {}, types: {}, read50: {}, read100: {}, leaves: {}, clicks: {}, clicks_from: {}, prints: {}, subscribe_from: {}, teaser_seen: {}, teaser_at: {}, tclicks: {}, mod_seen: {}, mod_clicks: {}, front_views: {}, front_in: {}, front_r50: {}, front_r100: {}, searches: {}}
       # Fill keys a state from an older version of this actor lacks.
       let current = ($blank | merge ($state | get -o today | default {}))
       let history = ($state | get -o history | default {})
@@ -218,6 +222,7 @@
           top: (do $top $current.paths 5 | each {|r| $r | insert title ($current.titles | get -o $r.name) })
           clicks: (do $total $current.clicks)
           prints: (do $total $current.prints)
+          searches: ($current.searches | values | reduce -f 0 {|x, acc| $acc + $x.n })
         }
         {today: $blank, history: ($history | upsert $current.day $closed
           | transpose k v | sort-by k | last 400 | reduce -f {} {|r, acc| $acc | insert $r.k $r.v })}
@@ -277,6 +282,15 @@
           | upsert titles (if ($s | get -o 3) == null or ($acc.titles | get -o $s.0) != null { $acc.titles } else { $acc.titles | upsert $s.0 ($s | get 3) })
           | upsert mod_seen (do $bump $acc.mod_seen (do $modkey $s.1 $s.2))
         })
+        # The words in lower case are the key; the latest spelling, result
+        # count and next page are kept, since the index changes.
+        "search" => {
+          let k = ($m | get -o q | default "" | str downcase)
+          if $k == "" { $t } else {
+            let n = ($t.searches | get -o $k | get -o n | default 0)
+            $t | upsert searches ($t.searches | upsert $k {q: $m.q, n: ($n + 1), hits: ($m | get -o hits), more: ($m | get -o more | default false)})
+          }
+        }
         "tclick" => ($t
           | upsert tclicks (do $bump $t.tclicks $m.target)
           | upsert mod_clicks (do $bump $t.mod_clicks (do $modkey $m.mod $m.pos)))

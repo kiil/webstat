@@ -228,7 +228,10 @@ to every page anonymous readers see, and `/nyt.php` forwards as on
 folkets.dk with the same key (both sites run on one hosting account). Its
 clicks are downloads, the teaching sets' PDFs; "Udskriv som PDF"
 (`/print/pdf/node/N`) is counted apart as prints (`prints` in
-`config.nuon`). The module writes the beacon inline into the page, as on
+`config.nuon`). On the search page (`/search/node?keys=...`) the beacon
+reports the words and how many results they gave; the board lists today's
+searches by count, case ignored, with searches that found nothing in red,
+and "Tidligere dage" the number per day. The module writes the beacon inline into the page, as on
 folkets.dk: EasyPrivacy, on in uBlock Origin, blocks any script named
 `webstat.js`, so a linked file is never loaded behind an ad blocker.
 
@@ -297,6 +300,7 @@ All under `webstat.<site>.`, empty body, the facts in meta; every event has
 | `click` | `target`: on folkets.dk the path and query of an `/abonnent` or `/stot` link, or `stripe`; on klimaleksikon.dk the path of a PDF or `/print/pdf/node/N`, counted as a print |
 | `teasers` | `seen`: front page teasers half in view for a second, `[path, module, place, headline]`; module `f` the showcase, `k` Kort nyt, `a` the archive bands, `u` Ugens eftertragtede, `h` Hot lige nu |
 | `tclick` | `target`, `mod`, `pos`: a click on one of those teasers |
+| `search` | `q` (the words, at most 100 characters), `hits` (results on the first page, 0 when nothing was found) and `more` (there is a next page): a search on klimaleksikon.dk / climate-encyclopedia.com (`/search/node?keys=`), the first page only |
 
 `visitor` is the first 16 hex of sha256(salt, IP, user agent), only when
 the IP is a public address. The server accepts events only from the origins

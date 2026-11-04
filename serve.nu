@@ -15,6 +15,7 @@
 #   read      the reader got through 50 or 100 percent of the article
 #   leave     seconds the page was visible, sent when it is hidden
 #   click     a click on a support or subscription link
+#   search    what a reader searched for, and how many results it gave
 #
 # No IP address or user agent is stored: the visitor is a hash of IP, user
 # agent and a salt that lives in memory for one day, so a visitor can be
@@ -246,6 +247,18 @@ def report []: any -> any {
     "tclick" => {
       let t = (teaser [($b | get -o target) ($b | get -o mod) ($b | get -o pos)])
       if $t == null { null } else { {kind: "tclick", meta: ($common | merge {target: $t.0, mod: $t.1, pos: $t.2})} }
+    }
+    "search" => {
+      let q = (text ($b | get -o q) 100)
+      let hits = ($b | get -o hits)
+      let more = ($b | get -o more)
+      if $q == null { null } else {
+        {kind: "search", meta: ($common | merge {
+          q: $q
+          hits: (if (int-in $hits 0 1000) { $hits } else { null })
+          more: (if ($more | describe) == "bool" { $more } else { null })
+        })}
+      }
     }
     "click" => {
       let target = (text ($b | get -o target) 200)

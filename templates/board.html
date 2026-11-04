@@ -8,6 +8,7 @@
   <div class="tile"><b>{% if today.visitors %}{{ today.visitors }}{% else %}–{% endif %}</b><span>Besøgende i dag</span></div>
   <div class="tile"><b>{{ today.clicks }}</b><span>{{ site.clicks }} i dag</span></div>
   {% if site.prints %}<div class="tile"><b>{{ today.prints or 0 }}</b><span>{{ site.prints }} i dag</span></div>{% endif %}
+  {% if today.searches %}<div class="tile"><b>{{ today.search_count }}</b><span>Søgninger i dag{% if today.search_zero %} · {{ today.search_zero }} uden resultat{% endif %}</span></div>{% endif %}
 </div>
 <div class="grid">
   <section>
@@ -68,6 +69,12 @@
     </table>
     {% if site.prints %}<h2>{{ site.prints }}</h2>
     <table>{% for r in today.prints_from %}<tr><td class="p">{{ link(r) }}</td><td class="n">{{ r.views }}</td></tr>{% else %}<tr><td class="empty">Ingen endnu</td></tr>{% endfor %}</table>{% endif %}
+    {% if today.searches %}<h2>Søgninger</h2>
+    <p class="note">Hvad læserne søgte efter i dag, og hvor mange resultater søgningen gav. 0: søgningen fandt intet.</p>
+    <table class="cols">
+      <tr><th>Søgning</th><th title="Antal søgninger">Antal</th><th title="Resultater (+: flere sider)">Res.</th></tr>
+      {% for r in today.searches %}<tr><td class="p"><a href="{{ site.base }}/search/node?keys={{ r.q | urlencode }}" target="_blank" rel="noreferrer">{{ r.q }}</a></td><td class="n">{{ r.n }}</td><td class="n{% if r.hits == 0 %} zero{% endif %}">{% if r.hits is none %}–{% else %}{{ r.hits }}{% if r.more %}+{% endif %}{% endif %}</td></tr>{% endfor %}
+    </table>{% endif %}
     {% if today.subscribe_from %}<h2>Til /abonnent fra</h2>
     <table>{% for r in today.subscribe_from %}<tr><td class="p">{{ link(r) }}</td><td class="n">{{ r.views }}</td></tr>{% endfor %}</table>{% endif %}
 
@@ -82,10 +89,11 @@
   </section>
 </div>
 {% if history %}
+{%- set searching = history | selectattr("searches") | list | length > 0 or today.searches %}
 <h2>Tidligere dage</h2>
 <table class="cols">
-  <tr><th>Dag</th><th>Mest læst</th><th>Besøg.</th><th>Vis.</th><th>Klik</th>{% if site.prints %}<th title="{{ site.prints }}">PDF</th>{% endif %}</tr>
-  {% for d in history %}<tr><td class="t">{{ d.day }}</td><td class="p">{% if d.top %}{{ link(d.top[0]) }}{% endif %}</td><td class="n">{% if d.visitors %}{{ d.visitors }}{% else %}–{% endif %}</td><td class="n">{{ d.views }}</td><td class="n">{{ d.clicks or "" }}</td>{% if site.prints %}<td class="n">{{ d.prints or "" }}</td>{% endif %}</tr>{% endfor %}
+  <tr><th>Dag</th><th>Mest læst</th><th>Besøg.</th><th>Vis.</th><th>Klik</th>{% if site.prints %}<th title="{{ site.prints }}">PDF</th>{% endif %}{% if searching %}<th title="Søgninger">Søg.</th>{% endif %}</tr>
+  {% for d in history %}<tr><td class="t">{{ d.day }}</td><td class="p">{% if d.top %}{{ link(d.top[0]) }}{% endif %}</td><td class="n">{% if d.visitors %}{{ d.visitors }}{% else %}–{% endif %}</td><td class="n">{{ d.views }}</td><td class="n">{{ d.clicks or "" }}</td>{% if site.prints %}<td class="n">{{ d.prints or "" }}</td>{% endif %}{% if searching %}<td class="n">{{ d.searches or "" }}</td>{% endif %}</tr>{% endfor %}
 </table>
 {% endif %}
 {% else %}
