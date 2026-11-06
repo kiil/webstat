@@ -2,7 +2,21 @@
 <html lang="da">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FBF8F1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#191816" media="(prefers-color-scheme: dark)">
+<!-- The install manifest. iOS reads the manifest for the home-screen name and
+     icon, but still wants its own apple-touch-icon and the two apple-mobile-*
+     hints below to open without Safari's chrome. -->
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Webstat">
+<!-- black-translucent lets main's own safe-area padding own the notch. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <script type="module" src="{{ datastar_js }}"></script>
 <meta name="robots" content="noindex">
 <title>Webstat</title>
@@ -11,8 +25,11 @@
 @media (prefers-color-scheme:dark){:root{--paper:#191816;--ink:#F1EDE4;--muted:#A39C90;--rule:#34312C;--red:#E0565C}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.45 Georgia,"Source Serif 4",serif}
-main{max-width:64rem;margin:0 auto;padding:2rem 16px 4rem}
+main{max-width:64rem;margin:0 auto;padding:calc(env(safe-area-inset-top) + 2rem) calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 4rem) calc(env(safe-area-inset-left) + 16px)}
 h1{font-size:2rem;margin:0 0 .25rem;letter-spacing:-.01em}
+header{display:flex;justify-content:space-between;align-items:center;gap:1rem}
+#bell{font:.8rem system-ui,sans-serif;color:var(--ink);background:none;border:1px solid var(--rule);border-radius:999px;padding:.3rem .7rem;cursor:pointer}
+#bell[data-state="denied"]{color:var(--muted);cursor:not-allowed}
 .sub{color:var(--muted);font:.85rem system-ui,sans-serif;margin-bottom:2rem}
 .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin-bottom:2.5rem}
 .tile{border-top:3px solid var(--ink);padding-top:.5rem}
@@ -33,6 +50,7 @@ small{color:var(--muted);font:.75rem system-ui,sans-serif}
 a{color:inherit}
 .live{display:inline-block;width:.55rem;height:.55rem;border-radius:50%;background:#2E9E5B;margin-right:.35rem;vertical-align:middle;animation:pulse 2s infinite}
 @keyframes pulse{50%{opacity:.35}}
+.offline .live{background:var(--muted);animation:none}
 .empty{color:var(--muted)}
 td.n.zero{color:var(--red);font-weight:700}
 nav{display:flex;flex-wrap:wrap;gap:.25rem 1rem;font:.85rem system-ui,sans-serif;margin-bottom:.75rem}
@@ -86,7 +104,7 @@ table.cols td.n{white-space:nowrap}
 {%- set q = "?site=" ~ site if site else "" -%}
 <body data-init="@get('/updates{{ q }}')" data-on:refresh="@get('/refresh{{ q }}')">
 <main>
-<h1>Webstat</h1>
+<header><h1>Webstat</h1><button id="bell" type="button" hidden>🔔 Morgenrapport</button></header>
 {% if sites | length > 1 %}<nav><a href="/"{% if not site %} aria-current="page"{% endif %}>Alle</a>{% for s in sites %}<a href="/?site={{ s.id }}"{% if s.id == site %} aria-current="page"{% endif %}>{{ s.name }}</a>{% endfor %}</nav>{% endif %}
 {{ board | safe }}
 </main>
@@ -105,6 +123,69 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 addEventListener("pageshow", (e) => { if (e.persisted) resync(); });
 addEventListener("online", resync);
 setInterval(() => { if (document.visibilityState === "visible") resync(); }, 60000);
+
+// Without a network the board is the last one the service worker kept, so the
+// live dot must not pulse.
+const marked = () => document.documentElement.classList.toggle("offline", !navigator.onLine);
+marked();
+addEventListener("online", marked);
+addEventListener("offline", marked);
+
+// The morning report as a push. Permission is only asked for behind the
+// button, never on load. On iOS PushManager exists only in the installed app,
+// so in Safari the button stays hidden.
+async function announce(reg) {
+  const {key} = await fetch("/api/push/key").then((r) => r.json());
+  const raw = atob(key.replace(/-/g, "+").replace(/_/g, "/"));
+  const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: Uint8Array.from(raw, (c) => c.charCodeAt(0)),
+  }));
+  // On every load, not just the first: Chrome rotates endpoints.
+  const r = await fetch("/api/push/subscribe", {
+    method: "POST",
+    headers: {"content-type": "application/json"},
+    body: JSON.stringify({endpoint: sub.endpoint}),
+  });
+  if (!r.ok) throw new Error(`subscribe: ${r.status}`);
+}
+
+function setupPush(reg) {
+  const b = document.getElementById("bell");
+  if (!("PushManager" in window) || !("Notification" in window)) return;
+  const paint = () => {
+    b.hidden = Notification.permission === "granted";
+    b.dataset.state = Notification.permission;
+    b.title = Notification.permission === "denied" ? "Notifikationer er blokeret for dette websted" : "Få gårsdagens tal som notifikation hver morgen";
+  };
+  paint();
+  if (Notification.permission === "granted") {
+    announce(reg).catch((e) => console.warn("webstat: push", e));
+    return;
+  }
+  b.addEventListener("click", async () => {
+    if ((await Notification.requestPermission()) === "granted") {
+      try { await announce(reg); } catch (e) { console.warn("webstat: push", e); b.textContent = "Kunne ikke slå til"; b.hidden = false; return; }
+    }
+    paint();
+  });
+}
+
+// See public/sw.js for what the worker does and does not cache. The Datastar
+// bundle is versioned in the URL, so the worker learns it from the page.
+if ("serviceWorker" in navigator) {
+  addEventListener("load", async () => {
+    try {
+      await navigator.serviceWorker.register("/sw.js");
+      const reg = await navigator.serviceWorker.ready;
+      const ds = document.querySelector('script[type="module"][src*="datastar"]');
+      if (ds) reg.active?.postMessage({type: "cache-asset", url: new URL(ds.src).pathname});
+      setupPush(reg);
+    } catch (e) {
+      console.warn("webstat: no service worker", e);
+    }
+  });
+}
 </script>
 </body>
 </html>

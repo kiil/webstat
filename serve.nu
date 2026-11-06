@@ -22,15 +22,16 @@
 # counted once a day and never followed across days.
 #
 # The actor in actors/stats.nu folds the events into today's figures and a
-# history per day for each site; the service in services/alerts.nu sends
-# spike alerts and a morning report. The page shows every site side by side
+# history per day for each site; the service in services/alerts.nu pushes
+# the morning report and articles taking off to the app. The page shows every site side by side
 # (the overview), or one site with `?site=`, and is live: Datastar opens
 # GET /updates, which sends the board as it stands and then a new board
-# every time the actor writes.
+# every time the actor writes. public/ makes the page an installable app.
 
 use http-nu/router *
 use http-nu/datastar *
 use ./lib.nu *
+use ./push.nu
 
 const HERE = (path self .)
 const CONFIG = (path self ./config.nuon)
@@ -99,7 +100,7 @@ def board-asked [req: record]: nothing -> any {
   if $asked in (sites | columns) { $asked } else { null }
 }
 
-# The secrets: the collector key and the ntfy topic. They live in the store,
+# The secret: the collector key. It lives in the store,
 # never in git; POST /admin/settings sets them (see the route).
 def secrets []: nothing -> record {
   try { (.last webstat.settings).meta | default {} } catch { {} }
@@ -395,7 +396,7 @@ def board [site: any]: nothing -> string {
       | metadata set { merge {'http.response': {headers: {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "max-age=60"}}} }
     })
 
-    # Sets the secrets {key, ntfy}. The first time anyone may; after that
+    # Sets the secret {key}. The first time anyone may; after that
     # only a request carrying the current key in X-Webstat-Key. The key must
     # be at least 32 characters.
     (route {method: "POST", path: "/admin/settings"} {|req ctx|
@@ -404,13 +405,44 @@ def board [site: any]: nothing -> string {
       let current = (secrets | get -o key | default "")
       let allowed = $current == "" or (($req.headers | get -o x-webstat-key | default "") == $current)
       let key = ($b | get -o key | default "" | into string)
-      let ntfy = ($b | get -o ntfy | default "" | into string)
       if not $allowed {
         "" | status 403
-      } else if not (($b | describe) | str starts-with "record") or ($key | str length) < 32 or not ($ntfy =~ '^[A-Za-z0-9_-]{8,64}$') {
-        "key (32+ characters) and ntfy (a topic name) are required" | status 400 {"Content-Type": "text/plain"}
+      } else if not (($b | describe) | str starts-with "record") or ($key | str length) < 32 {
+        "key (32+ characters) is required" | status 400 {"Content-Type": "text/plain"}
       } else {
-        "" | .append webstat.settings --ttl "last:1" --meta {key: $key, ntfy: $ntfy} | ignore
+        "" | .append webstat.settings --ttl "last:1" --meta {key: $key} | ignore
+        "" | status 204
+      }
+    })
+
+    # What a phone shows when a push wakes its service worker: the latest
+    # notice while it is fresh, else the morning report. The push itself
+    # carries nothing; see push.nu.
+    (route {method: "GET", path: "/api/notice"} {|req ctx|
+      let notice = (try { (.last webstat.notice).meta } catch { null })
+      if $notice != null and ((now-seconds) - $notice.ts) < 21600 {
+        $notice | select title body url tag
+      } else {
+        let all = (try { (.last webstat-stats.out).meta | get -o sites | default {} } catch { {} })
+        morning-report (sites) $all (today)
+      } | to json | metadata set --content-type "application/json"
+    })
+
+    # Public by definition: it identifies this server to the push service.
+    (route {method: "GET", path: "/api/push/key"} {|req ctx|
+      {key: (push public-key)} | to json | metadata set --content-type "application/json"
+    })
+
+    # A browser handing over the endpoint it can be woken on. A new one gets
+    # yesterday's report at once, which shows that push works.
+    (route {method: "POST", path: "/api/push/subscribe"} {|req ctx|
+      let raw = $in
+      let b = (try { $raw | decode utf-8 | from json } catch { try { $raw | from json } catch { null } })
+      let endpoint = (if (($b | describe) | str starts-with "record") { $b | get -o endpoint | default "" | into string } else { "" })
+      if not (push valid-endpoint $endpoint) {
+        "not a push endpoint" | status 400 {"Content-Type": "text/plain"}
+      } else {
+        if (push subscribe $endpoint) { push send $endpoint --ttl 3600 | ignore }
         "" | status 204
       }
     })
@@ -470,6 +502,8 @@ def board [site: any]: nothing -> string {
       } | .mj ($HERE | path join "templates" "page.html")
     })
 
-    (route true {|req ctx| "Not found" | status 404 {"Content-Type": "text/plain"} })
+    # What makes the page an installable app: the service worker, the manifest
+    # and the icons.
+    (route true {|req ctx| .static ($HERE | path join "public") $req.path })
   ]
 }

@@ -1,6 +1,6 @@
-# Settings for webstat that are safe to keep in git. The collector key and
-# the ntfy topic are secrets: they live in the store (webstat.settings), set
-# with POST /admin/settings, never in this repo.
+# Settings for webstat that are safe to keep in git. The collector key is a
+# secret: it lives in the store (webstat.settings), set with
+# POST /admin/settings, never in this repo.
 {
   # Local hour (Copenhagen) for the morning report on yesterday.
   report_hour: 7
@@ -8,7 +8,7 @@
   # (`webstat.<site>.*`). The first is the dashboard's default.
   #   origins  the pages' origins; a beacon from anywhere else gets 403
   #   base     where a path on the site is linked to
-  #   name     how the site is named on the board and in ntfy messages
+  #   name     how the site is named on the board and in notifications
   #   spike    a path whose hot score reaches this is "taking off" (one
   #            alert a day per path)
   #   clicks   what the beacon's click events count on this site

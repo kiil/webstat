@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+  <!-- Android keeps only the alpha channel of a badge, so it is one colour. -->
+  <g fill="#fff">
+    <rect x="12" y="58" width="14" height="26" rx="2"/>
+    <rect x="30" y="40" width="14" height="44" rx="2"/>
+    <rect x="48" y="50" width="14" height="34" rx="2"/>
+    <rect x="66" y="16" width="14" height="68" rx="2"/>
+  </g>
+</svg>

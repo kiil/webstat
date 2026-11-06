@@ -13,11 +13,11 @@ feed); `/?site=klimaleksikon` shows one site in full.
 | `serve.nu` | http-nu handler: `POST /hit` (events), `GET /` (live dashboard), `GET /updates` and `GET /refresh` (Datastar SSE), `GET /api/hot`, `GET /api/stats`, `GET /health`, `GET /whoami`; all but `/hit` take `?site=` |
 | `lib.nu` | hot score and small helpers shared by the handler and the service |
 | `actors/stats.nu` | folds the events into today's figures and a history per day for each site, written to `webstat-stats.out` (`sites.<site>`) |
-| `services/alerts.nu` | spike alerts and the morning report via ntfy |
+| `services/alerts.nu` | the morning report and articles taking off, as pushes to the installed app |
 | `templates/page.html`, `templates/board.html`, `templates/overview.html` | the dashboard shell and the region `#board` that Datastar patches (minijinja): one site, or all of them |
 | `beacon.js` | the script for folkets.dk's palette block |
 | `config.nuon` | the sites (origins, link base, name, spike threshold, what clicks count) and the report hour (no secrets) |
-| `secrets.nuon` | local only, gitignored: the collector key and the ntfy topic, sent once with `POST /admin/settings` |
+| `secrets.nuon` | local only, gitignored: the collector key, sent once with `POST /admin/settings` |
 
 The collectors live with the sites: folkets.dk's in the folkets repo
 (`tools/folkets/site/nyt.php`), klimaleksikon.dk's in the klimaleksikon repo
@@ -221,6 +221,22 @@ visibility, `pageshow`, `online`, and once a minute while visible) it calls
 `GET /refresh` for one patch, because a stream can die without an error. If
 Caddy buffers responses, turn that off for `/updates` or nothing arrives.
 
+## Install as an app
+
+The page is a PWA, like Janus and Hit: `manifest.webmanifest`, an icon set
+under `/icons/` and `sw.js`, all in `public/`. Chrome offers **Install**, iOS
+**Føj til hjemmeskærm**, and either way it opens in its own window with no
+address bar.
+
+The worker is not a caching layer. It keeps the shell and the last board for
+each view, and uses them only when the server cannot be reached. The dot next
+to "live" stops pulsing when the browser knows it is offline; when only the
+server is down the browser does not know, and the old board still looks live
+(the time beside it is when it was rendered). `/hit`, `/api/*`, `/updates` and
+`/refresh` are never touched. Everything is network-first, so a new deploy
+reaches installed apps by itself; bump `VERSION` in `sw.js` only when the
+worker's own caching changes.
+
 ## Collectors
 
 On klimaleksikon.dk the module `klimaleksikon_webstat` attaches the beacon
@@ -251,28 +267,41 @@ as the key webstat keeps in its store) and `X-Webstat-Ip`. Only a request with t
 name the IP. `GET /nyt.php?hot` serves `/api/hot`, cached for a minute, to the
 "Hot lige nu" block the beacon builds on the front page.
 
-## Alerts and morning report
+## Notifications
 
-`services/alerts.nu` checks every site once a minute. A path whose hot score
-reaches the site's `spike` gets one ntfy message a day ("Tager fart: …", with the main referrer
-and a link); `webstat.alert` frames record what was sent. After
-`report_hour` (Copenhagen) it sends one report on yesterday: views, visitors,
-clicks and the top five, one per site (`webstat.report` frames; both kinds
-carry `site`, and frames from before that belong to folkets). Subscribe to the
-topic in the ntfy app; anyone who knows the topic can read it.
+The installed app can get one short report a morning: yesterday's views per
+site, the most read article and the clicks. Press **🔔 Morgenrapport** in the
+app (on iOS it is there only once the app is on the home screen). A new
+subscriber gets yesterday's report at once, which shows that it works.
+
+A path whose hot score reaches the site's `spike` gets one push a day ("Tager
+fart: …", with the views, the main referrer and a link to the article);
+`webstat.alert` frames record what was sent. Several found in the same minute
+share one push.
+
+They are Web Pushes, sent by `services/alerts.nu`, the report after
+`report_hour`. As in Janus a push is empty and signed with `openssl`
+(`push.nu`), and the service worker fetches the text from `GET /api/notice`
+(the latest `webstat.notice`, else the report), so it needs neither node nor
+the Mac. A phone that was offline for both a report and a later alert shows
+only the latest. The
+VAPID key and the subscriptions live in `$CROSS_STREAM_SITE_STATE`
+(`vapid.pem`, `webstat-push.json`), or `./state` locally. A new key kills every
+subscription. `webstat.push` records the day it went out. `POST
+/api/push/subscribe` takes only the endpoints of the real push services, at
+most 20, as it is as open as the dashboard.
 
 ## Secrets
 
-The collector key and the ntfy topic are kept out of git. They live in the
-store as `webstat.settings` (ttl last:1), set with
+The collector key is kept out of git. It lives in the store as `webstat.settings` (ttl last:1), set with
 
 ```bash
 nu -c 'open secrets.nuon | to json' | curl -sX POST https://webstat.kiil.cross.stream/admin/settings --data-binary @-
 ```
 
-The first call may set them; after that a call must carry the current key in
-`X-Webstat-Key`. Without them webstat still counts views, but no visitor is
-recorded and no alert is sent.
+The first call may set it; after that a call must carry the current key in
+`X-Webstat-Key`. Without it webstat still counts views, but no collector is
+trusted with the reader's address.
 
 ## Hot right now
 
@@ -339,4 +368,6 @@ the device, and sent in reports under the 4096 bytes `nyt.php` passes on.
 
 `GET /` and `GET /api/stats` are open to anyone who knows the address. To
 close them, put basic auth in front of everything except `/hit` and
-`/api/hot`, which the collector on folkets.dk calls.
+`/api/hot`, which the collector on folkets.dk calls, and `/sw.js`,
+`/manifest.webmanifest`, `/icons/` and `/api/notice`, which an installed app
+and its worker fetch without credentials.
