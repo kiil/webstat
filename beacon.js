@@ -242,7 +242,8 @@
             if (teaserTimers.get(el)) { return; }
             teaserTimers.set(el, setTimeout(function () {
               var t = teaserOf(el);
-              if (t && !teaserSeen[t[0]]) { teaserSeen[t[0]] = true; teaserPending.push(t); }
+              var key = t && t.slice(0, 3).join('|');
+              if (t && !teaserSeen[key]) { teaserSeen[key] = true; teaserPending.push(t); }
               teaserObserver.unobserve(el);
             }, 1000));
           } else if (teaserTimers.get(el)) {
