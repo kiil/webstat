@@ -25,20 +25,20 @@
     {%- set kinds = {"v": ["▶", "Video"], "e": ["◧", "Indlejring"], "i": ["▣", "Billede"], "q": ["❝", "Citat"], "t": ["▦", "Tabel"], "h": ["H", "Mellemrubrik"], "a": ["♪", "Lyd"]} %}
     {% if today.attention %}
     <h2>Hvor læserne hviler og stopper</h2>
-    <p class="note">Læserfloden: artiklen fra top til bund. Flodens bredde er de læsere, der stadig er med; den smalner ind, hvor de står af. Jo rødere, jo længere hviler de og læser. Mærkerne er artiklens video, billeder, tabeller, citater og mellemrubrikker.</p>
+    <p class="note">Læserfloden: artiklen fra top til bund. Flodens højde er de læsere, der stadig er med; den falder, hvor de står af. Jo rødere, jo længere hviler de og læser. Mærkerne er artiklens video, billeder, tabeller, citater og mellemrubrikker.</p>
     {% for a in today.attention %}
     <div class="att">
       <div class="att-head"><span class="p">{{ link(a) }}</span><small>{{ a.n }} målt · {{ a.finished }} % læste færdig</small></div>
       <div class="att-marks">{% for k in a.marks %}<i class="mk{% if a.brake and k.pos == a.brake.pos %} brake{% endif %}" style="left:{{ k.pos }}%" title="{{ kinds[k.kind][1] }}{% if k.label %}: {{ k.label }}{% endif %} · ved {{ k.pos }} % · nået af {{ k.reached_pct }} %{% if k.dwell %} · {{ k.dwell }} s i synsfeltet (median){% endif %}{% if k.engaged %} · {{ k.engaged }} klikkede ind{% endif %}{% if k.stop_pct is not none %} · {{ k.stop_pct }} % stoppede her{% endif %}">{{ kinds[k.kind][0] }}</i>{% endfor %}</div>
       {% if a.flow %}
-      {#- The river: one closed path, the top bank left to right and the
-          bottom bank back again, each band eased into the next. Its fill is
-          a gradient whose stops carry the heat of the bands. -#}
+      {#- The river: an area from zero at the bottom, its top edge the share
+          of readers still reading, each band eased into the next. Its fill
+          is a gradient whose stops carry the heat of the bands. -#}
       <div class="river">
         <svg viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="{{ a.finished }} % af {{ a.n }} læsere nåede til bunden">
           <defs><linearGradient id="heat{{ loop.index }}">{% for b in a.flow %}<stop offset="{{ loop.index0 * 5 + 2.5 }}%" class="h{{ b.heat }}"/>{% endfor %}</linearGradient></defs>
           <rect class="bed" width="1000" height="100" rx="3"/>
-          <path class="water" fill="url(#heat{{ loop.index }})" d="M0,{{ 50 - a.flow[0].from / 2 }}{% for b in a.flow %}{% set x = loop.index0 * 50 %} C{{ x + 25 }},{{ 50 - b.from / 2 }} {{ x + 25 }},{{ 50 - b.to / 2 }} {{ x + 50 }},{{ 50 - b.to / 2 }}{% endfor %} L1000,{{ 50 + a.flow[19].to / 2 }}{% for b in a.flow | reverse %}{% set x = (19 - loop.index0) * 50 %} C{{ x + 25 }},{{ 50 + b.to / 2 }} {{ x + 25 }},{{ 50 + b.from / 2 }} {{ x }},{{ 50 + b.from / 2 }}{% endfor %}Z"/>
+          <path class="water" fill="url(#heat{{ loop.index }})" d="M0,{{ 100 - a.flow[0].from }}{% for b in a.flow %}{% set x = loop.index0 * 50 %} C{{ x + 25 }},{{ 100 - b.from }} {{ x + 25 }},{{ 100 - b.to }} {{ x + 50 }},{{ 100 - b.to }}{% endfor %} L1000,100 L0,100Z"/>
           {% for k in a.marks %}<line class="pin{% if a.brake and k.pos == a.brake.pos %} brake{% endif %}" x1="{{ k.pos * 10 }}" x2="{{ k.pos * 10 }}" y1="0" y2="100"/>{% endfor %}
           {% for b in a.flow %}<rect class="band" x="{{ loop.index0 * 50 }}" width="50" height="100"><title>{{ loop.index0 * 5 }}–{{ loop.index0 * 5 + 5 }} % af artiklen · {{ b.from }} % af læserne er med · {{ b.rest }} s hvile i alt{% if b.left %} · {{ b.left }} stod af her{% endif %}</title></rect>{% endfor %}
         </svg>

@@ -351,7 +351,7 @@ while resting, clicked into 1/0]`; a click into an iframe is seen as the page
 losing focus to it.
 
 The board's "Hvor læserne hviler og stopper" draws, for the most read
-articles, a river from top to bottom: its width is the share of readers
+articles, a river from top to bottom: its height is the share of readers
 still in the article (a finished reading runs to the end, an unfinished one
 ends where the reading line last rested), its redness the resting heat, with
 the landmarks pinned across it and the biggest losses labelled underneath.
