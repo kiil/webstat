@@ -109,7 +109,7 @@ table.cols td.n{white-space:nowrap}
 </style>
 </head>
 {%- set q = "?site=" ~ site if site else "" -%}
-<body data-init="@get('/updates{{ q }}')" data-on:refresh="@get('/refresh{{ q }}')">
+<body{% if not still %} data-init="@get('/updates{{ q }}')" data-on:refresh="@get('/refresh{{ q }}')"{% endif %}>
 <main>
 <header><h1>Webstat</h1><button id="bell" type="button" hidden>🔔 Morgenrapport</button></header>
 {% if sites | length > 1 %}<nav><a href="/"{% if not site %} aria-current="page"{% endif %}>Alle</a>{% for s in sites %}<a href="/?site={{ s.id }}"{% if s.id == site %} aria-current="page"{% endif %}>{{ s.name }}</a>{% endfor %}</nav>{% endif %}

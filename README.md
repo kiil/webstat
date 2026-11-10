@@ -10,11 +10,13 @@ feed); `/?site=klimaleksikon` shows one site in full.
 
 | File | Role |
 | --- | --- |
-| `serve.nu` | http-nu handler: `POST /hit` (events), `GET /` (live dashboard), `GET /updates` and `GET /refresh` (Datastar SSE), `GET /api/hot`, `GET /api/stats`, `GET /health`, `GET /whoami`; all but `/hit` take `?site=` |
+| `serve.nu` | http-nu handler: `POST /hit` (events), `GET /` (live dashboard), `GET /visual` (a site's articles from their first reading to now), `GET /updates` and `GET /refresh` (Datastar SSE), `GET /api/hot`, `GET /api/stats`, `GET /health`, `GET /whoami`; all but `/hit` take `?site=` |
 | `lib.nu` | hot score and small helpers shared by the handler and the service |
+| `attention.nu` | where the readers of an article rest and stop, from its leaves; used by the handler and written into the actor |
 | `actors/stats.nu` | folds the events into today's figures and a history per day for each site, written to `webstat-stats.out` (`sites.<site>`) |
 | `services/alerts.nu` | the morning report and articles taking off, as pushes to the installed app |
 | `templates/page.html`, `templates/board.html`, `templates/overview.html` | the dashboard shell and the region `#board` that Datastar patches (minijinja): one site, or all of them |
+| `templates/river.html`, `templates/visual.html` | the river of one article (a macro the board shares), and `/visual`: every reading of the articles a site's `attention` pattern picks, not just today's |
 | `beacon.js` | the script for folkets.dk's palette block |
 | `config.nuon` | the sites (origins, link base, name, spike threshold, what clicks count) and the report hour (no secrets) |
 | `secrets.nuon` | local only, gitignored: the collector key, sent once with `POST /admin/settings` |

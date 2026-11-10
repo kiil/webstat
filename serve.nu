@@ -31,6 +31,7 @@
 use http-nu/router *
 use http-nu/datastar *
 use ./lib.nu *
+use ./attention.nu *
 use ./push.nu
 
 const HERE = (path self .)
@@ -74,6 +75,7 @@ try {
     | reduce -f {} {|r, acc| $acc | insert $r.id $r.only })
   (open --raw ($HERE | path join "actors" "stats.nu"))
   | str replace "let attention_only = {}" $"let attention_only = ($only | to json --raw)"
+  | str replace "# @attention-of" (open --raw ($HERE | path join "attention.nu") | str replace "export def" "def")
   | .append xs.actor.webstat-stats.create --ttl "last:1" | ignore
   # The service imports lib.nu and reads config.nuon from this checkout.
   ($"const HERE = '($HERE)'\n" + (open --raw ($HERE | path join "services" "alerts.nu")))
@@ -349,6 +351,41 @@ def overview-data []: nothing -> record {
   }
 }
 
+# Every reading of the articles a site draws attention for (config.nuon's
+# `attention`), not just today's: the view-model for templates/visual.html.
+# It reads the site's leave and page view events from the first one, so it
+# is made when the page is asked for, not on every new figure.
+def visual-data [site: string]: nothing -> record {
+  let conf = (sites | get $site)
+  let only = ($conf | get -o attention)
+  let metas = {|kind: string|
+    if $only == null { [] } else {
+      .cat -T $"webstat.($site).($kind)" | each {|f| $f.meta? | default {} } | where {|m| ($m | get -o path | default "") =~ $only }
+    }
+  }
+  let views = (do $metas "pageview" | group-by path)
+  # The latest leave of each page view, as the stats actor keeps them.
+  let leaves = (do $metas "leave" | where {|m| ($m | get -o view) != null and ($m | get -o rest) != null }
+    | reduce -f {} {|m, acc| $acc | upsert $m.view $m } | values | group-by path)
+  let stories = ($leaves | items {|path, ls|
+    let at = (attention-of $ls)
+    let seen = ($views | get -o $path | default [])
+    if $at == null { null } else {
+      {
+        name: $path
+        title: ($seen | get -o title | compact | last 1 | get -o 0)
+        views: ($seen | length)
+        since: ($seen | get -o day | compact | get -o 0)
+      } | merge $at
+    }
+  } | compact | sort-by n --reverse)
+  {
+    stories: $stories
+    site: ($conf | insert id $site)
+    rendered: (date now | date to-timezone Europe/Copenhagen | format date "%H:%M:%S")
+  }
+}
+
 # A site's board, or the overview when site is null.
 def board [site: any]: nothing -> string {
   if $site == null {
@@ -502,6 +539,19 @@ def board [site: any]: nothing -> string {
       {
         board: (board $site)
         site: $site
+        sites: (sites | transpose id s | each {|r| {id: $r.id, name: $r.s.name} })
+        datastar_js: (datastar-js)
+      } | .mj ($HERE | path join "templates" "page.html")
+    })
+
+    # A site's articles from their first reading to now; a still page, made
+    # when it is asked for.
+    (route {method: "GET", path: "/visual"} {|req ctx|
+      let site = (site-asked $req)
+      {
+        board: (visual-data $site | .mj ($HERE | path join "templates" "visual.html"))
+        site: $site
+        still: true
         sites: (sites | transpose id s | each {|r| {id: $r.id, name: $r.s.name} })
         datastar_js: (datastar-js)
       } | .mj ($HERE | path join "templates" "page.html")
