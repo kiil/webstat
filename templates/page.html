@@ -90,11 +90,18 @@ small.dom{margin-left:.3rem;opacity:.75;white-space:nowrap}
 .att-marks{position:relative;height:1.15rem}
 .att-marks i{position:absolute;transform:translateX(-50%);font:600 .72rem/1 system-ui,sans-serif;font-style:normal;color:var(--muted);cursor:help;bottom:.15rem}
 .att-marks i.brake{color:var(--red);font-size:.9rem}
-.att-heat{display:flex;height:.9rem;border-radius:2px;overflow:hidden;background:var(--rule)}
-.att-heat i{flex:1;background:var(--red)}
-.att-heat .h0{opacity:0}.att-heat .h1{opacity:.15}.att-heat .h2{opacity:.32}.att-heat .h3{opacity:.5}.att-heat .h4{opacity:.72}.att-heat .h5{opacity:1}
-.att-exit{display:flex;align-items:flex-start;gap:1px;height:1.4rem;margin-top:2px}
-.att-exit i{flex:1;background:var(--muted);opacity:.55;border-radius:0 0 1px 1px}
+.river{position:relative}
+.river svg{display:block;width:100%;height:4.5rem;overflow:visible}
+.river .bed{fill:var(--rule);opacity:.45}
+.river stop{stop-color:var(--red)}
+.river stop.h0{stop-opacity:.1}.river stop.h1{stop-opacity:.24}.river stop.h2{stop-opacity:.4}.river stop.h3{stop-opacity:.58}.river stop.h4{stop-opacity:.78}.river stop.h5{stop-opacity:1}
+.river .water{stroke:var(--red);stroke-width:1;vector-effect:non-scaling-stroke}
+.river .pin{stroke:var(--muted);stroke-width:1;stroke-dasharray:2 3;opacity:.6;vector-effect:non-scaling-stroke}
+.river .pin.brake{stroke:var(--ink);stroke-dasharray:none;opacity:1}
+.river .band{fill:var(--ink);fill-opacity:0}
+.river .band:hover{fill-opacity:.1}
+.falls{position:relative;display:flex;justify-content:space-between;height:1rem;margin-top:.25rem;font:600 .7rem/1 system-ui,sans-serif;color:var(--muted);font-variant-numeric:tabular-nums}
+.falls i{position:absolute;transform:translateX(-50%);white-space:nowrap;font-style:normal;font-weight:400}
 .brake-note{font:.82rem/1.4 system-ui,sans-serif;margin:.35rem 0 0;color:var(--ink)}
 table.mods{max-width:26rem}
 table.cols td.n{white-space:nowrap}

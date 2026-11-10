@@ -351,8 +351,11 @@ while resting, clicked into 1/0]`; a click into an iframe is seen as the page
 losing focus to it.
 
 The board's "Hvor læserne hviler og stopper" draws, for the most read
-articles, the resting heat from top to bottom, where unfinished readings
-ended, and the landmarks. A landmark that at least three readers reached and
+articles, a river from top to bottom: its width is the share of readers
+still in the article (a finished reading runs to the end, an unfinished one
+ends where the reading line last rested), its redness the resting heat, with
+the landmarks pinned across it and the biggest losses labelled underneath.
+A landmark that at least three readers reached and
 at least 20 percent of them stopped at (ending between 2 points above and 10
 below it, without finishing) is named as the brake.
 
