@@ -539,6 +539,7 @@ def board [site: any]: nothing -> string {
       {
         board: (board $site)
         site: $site
+        visual: ($site != null and (sites | get $site | get -o attention) != null)
         sites: (sites | transpose id s | each {|r| {id: $r.id, name: $r.s.name} })
         datastar_js: (datastar-js)
       } | .mj ($HERE | path join "templates" "page.html")
@@ -552,6 +553,7 @@ def board [site: any]: nothing -> string {
         board: (visual-data $site | .mj ($HERE | path join "templates" "visual.html"))
         site: $site
         still: true
+        visual: ((sites | get $site | get -o attention) != null)
         sites: (sites | transpose id s | each {|r| {id: $r.id, name: $r.s.name} })
         datastar_js: (datastar-js)
       } | .mj ($HERE | path join "templates" "page.html")

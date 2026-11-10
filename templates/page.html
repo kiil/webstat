@@ -55,6 +55,7 @@ a{color:inherit}
 td.n.zero{color:var(--red);font-weight:700}
 nav{display:flex;flex-wrap:wrap;gap:.25rem 1rem;font:.85rem system-ui,sans-serif;margin-bottom:.75rem}
 nav a{color:var(--muted);text-decoration:none}
+nav.under{font-size:.78rem;margin-top:-.35rem}
 nav a[aria-current]{color:var(--ink);font-weight:600;border-bottom:2px solid var(--red)}
 td.heat{text-align:right;white-space:nowrap;width:1%;padding-left:.75rem;line-height:1;font-size:.95rem}
 td.heat i{font-style:normal;display:inline-block;margin-left:-.28em;transform-origin:50% 100%}
@@ -113,6 +114,7 @@ table.cols td.n{white-space:nowrap}
 <main>
 <header><h1>Webstat</h1><button id="bell" type="button" hidden>🔔 Morgenrapport</button></header>
 {% if sites | length > 1 %}<nav><a href="/"{% if not site %} aria-current="page"{% endif %}>Alle</a>{% for s in sites %}<a href="/?site={{ s.id }}"{% if s.id == site %} aria-current="page"{% endif %}>{{ s.name }}</a>{% endfor %}</nav>{% endif %}
+{% if visual %}<nav class="under"><a href="/?site={{ site }}"{% if not still %} aria-current="page"{% endif %}>I dag</a><a href="/visual?site={{ site }}"{% if still %} aria-current="page"{% endif %}>Visual</a></nav>{% endif %}
 {{ board | safe }}
 </main>
 <script>
