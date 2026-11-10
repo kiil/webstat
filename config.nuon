@@ -14,6 +14,8 @@
   #   clicks   what the beacon's click events count on this site
   #   prints   (optional) the name for clicks on /print/ links, counted
   #            apart from the other clicks
+  #   attention (optional) a pattern; only paths that match it are drawn
+  #            under "Hvor læserne hviler og stopper"
   sites: {
     folkets: {
       origins: ["https://www.folkets.dk" "https://folkets.dk"]
@@ -21,6 +23,7 @@
       name: "Folkets"
       spike: 6
       clicks: "Støtteklik"
+      attention: "^/videnshistorie/"
     }
     klimaleksikon: {
       origins: ["https://klimaleksikon.dk" "https://www.klimaleksikon.dk"]

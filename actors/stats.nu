@@ -26,6 +26,11 @@
 # as what the teaser led to.
 {
   run: {|frame, state = {}|
+    # Per site, the pattern a path must match for its attention to be shown
+    # (config.nuon's `attention`); a site without one shows its most read
+    # articles. serve.nu fills this line in when it registers the actor,
+    # because the actor's engine sees nothing outside `run`.
+    let attention_only = {}
     let top = {|r: record, n: int| $r | transpose name views | sort-by views --reverse | first $n }
     let total = {|r: record| $r | values | reduce -f 0 {|x, acc| $acc + $x } }
     let pct = {|a: int, b: int| if $b == 0 { null } else { [($a * 100 // $b) 100] | math min } }
@@ -97,7 +102,7 @@
     }
 
     # One site's summary for the dashboard, from its state.
-    let summarize = {|s: record, id: string|
+    let summarize = {|s: record, id: string, site: string|
       let today = $s.today
       let titled = {|rows| $rows | each {|r| $r | insert title ($today.titles | get -o $r.name) } }
       let leaves = ($today.leaves | values)
@@ -124,8 +129,15 @@
           }
         })
 
-      # Attention in the most read articles that have measurements.
-      let attended = ($articles | each {|a|
+      # Attention in the most read articles that have measurements, or in
+      # the most read of the paths the site asks for.
+      let only = ($attention_only | get -o $site)
+      let pool = (if $only == null { $articles } else {
+        do $top $today.paths 500
+        | where {|r| $r.name =~ $only and ($today.titles | get -o $r.name) != null }
+        | each {|r| {name: $r.name, title: ($today.titles | get $r.name), views: $r.views} }
+      })
+      let attended = ($pool | each {|a|
         let at = (do $attention ($by_path | get -o $a.name | default []))
         if $at == null { null } else { {name: $a.name, title: $a.title, views: $a.views} | merge $at }
       } | compact | first 6)
@@ -201,7 +213,7 @@
     if $frame.topic == "xs.threshold" {
       let sites = ($state | get -o sites | default {})
       if ($sites | is-empty) { return {next: $state} }
-      let sites = ($sites | items {|name, s| {name: $name, s: ($s | upsert out (do $summarize $s.state $frame.id))} } | reduce -f {} {|r, acc| $acc | insert $r.name $r.s })
+      let sites = ($sites | items {|name, s| {name: $name, s: ($s | upsert out (do $summarize $s.state $frame.id $name))} } | reduce -f {} {|r, acc| $acc | insert $r.name $r.s })
       return {out: {updated: $frame.id, sites: ($sites | items {|name, s| {name: $name, out: $s.out} } | reduce -f {} {|r, acc| $acc | insert $r.name $r.out })}, next: {sites: $sites}}
     }
     let p = ($frame.topic | split row ".")
@@ -330,7 +342,7 @@
     let ts = ($m | get -o ts)
     let fresh = ($ts | describe) == "int" and ((date now | into int) // 1_000_000_000) - $ts < 120
     if not $fresh { return {next: {sites: ($sites | upsert $site {state: $next, out: $before.out})}} }
-    let sites = ($sites | upsert $site {state: $next, out: (do $summarize $next $frame.id)})
+    let sites = ($sites | upsert $site {state: $next, out: (do $summarize $next $frame.id $site)})
     {out: {updated: $frame.id, sites: ($sites | items {|name, s| {name: $name, out: $s.out} } | where out != null | reduce -f {} {|r, acc| $acc | insert $r.name $r.out })}, next: {sites: $sites}}
   }
 

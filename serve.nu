@@ -68,7 +68,12 @@ def internal-ip [ip: string]: nothing -> bool {
 const BOT = '(?i)bot|crawl|spider|slurp|externalhit|externalagent|curl|python|wget|headless|monitor|preview|scan|http|java|okhttp|axios|feed|rss|lighthouse|semrush|ahrefs|gpt|claude|perplexity|bytespider|petal|yandex|baidu'
 
 try {
+  # The actor sees nothing outside its `run`, so the sites' attention
+  # patterns are written into it.
+  let only = (open $CONFIG | get sites | items {|id, s| {id: $id, only: ($s | get -o attention)} } | where only != null
+    | reduce -f {} {|r, acc| $acc | insert $r.id $r.only })
   (open --raw ($HERE | path join "actors" "stats.nu"))
+  | str replace "let attention_only = {}" $"let attention_only = ($only | to json --raw)"
   | .append xs.actor.webstat-stats.create --ttl "last:1" | ignore
   # The service imports lib.nu and reads config.nuon from this checkout.
   ($"const HERE = '($HERE)'\n" + (open --raw ($HERE | path join "services" "alerts.nu")))
